@@ -1,4 +1,5 @@
 import type { ADTSourceCode, ADTObject, SyntaxCheckResult, ActivationResult } from '../types/adt';
+import { getToken, getRealm, refreshToken } from './auth';
 
 let BASE_URL = import.meta.env.VITE_API_BASE_URL as string || '';
 
@@ -11,8 +12,21 @@ export function getBaseUrl(): string {
 }
 
 async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
+  await refreshToken();
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const realm = getRealm();
+  if (realm) {
+    headers['X-Realm'] = realm;
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...options,
   });
   if (!res.ok) {

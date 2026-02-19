@@ -1,6 +1,7 @@
 import { useConnectionStore } from '../../stores/connectionStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { ConnectionStatus } from '../../types/lsp';
+import { getUsername, getRealm, logout } from '../../services/auth';
 
 interface StatusBarProps {
   cursorLine: number;
@@ -69,6 +70,22 @@ export function StatusBar({ cursorLine, cursorColumn }: StatusBarProps) {
 
       <span>UTF-8</span>
       <span>ABAP</span>
+
+      {/* Realm */}
+      {getRealm() && (
+        <span className="uppercase bg-white/10 px-1.5 rounded">{getRealm()}</span>
+      )}
+
+      {/* User info */}
+      {getUsername() && (
+        <button
+          onClick={logout}
+          className="flex items-center gap-1 hover:text-white/90 cursor-pointer"
+          title="Click to logout"
+        >
+          <span>{getUsername()}</span>
+        </button>
+      )}
     </div>
   );
 }
