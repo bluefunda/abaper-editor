@@ -1,0 +1,21 @@
+# Deploy on: apps node
+# Runs the abaper Go backend (REST API + LSP server)
+services:
+  abaper:
+    image: bluefunda/abaper:latest
+    command: abaper --server -p 8080
+    ports:
+      - "8080:8080"
+      - "8089:8089"
+    environment:
+      - SAP_HOST=${SAP_HOST:?Set SAP_HOST}
+      - SAP_CLIENT=${SAP_CLIENT:-001}
+      - SAP_USERNAME=${SAP_USERNAME:?Set SAP_USERNAME}
+      - SAP_PASSWORD=${SAP_PASSWORD:?Set SAP_PASSWORD}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

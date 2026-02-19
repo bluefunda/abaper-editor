@@ -1,0 +1,31 @@
+# Full stack — local development only
+# For production, use docker-compose.frontend.yml and docker-compose.apps.yml on their respective nodes
+services:
+  editor:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - ABAPER_HOST=abaper
+      - ABAPER_PORT=8080
+      - ABAPER_LSP_PORT=8089
+    depends_on:
+      abaper:
+        condition: service_healthy
+
+  abaper:
+    image: bluefunda/abaper:latest
+    command: abaper --server -p 8080
+    ports:
+      - "8080:8080"
+    environment:
+      - SAP_HOST=${SAP_HOST:-}
+      - SAP_CLIENT=${SAP_CLIENT:-}
+      - SAP_USERNAME=${SAP_USERNAME:-}
+      - SAP_PASSWORD=${SAP_PASSWORD:-}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

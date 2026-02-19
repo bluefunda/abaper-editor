@@ -1,0 +1,17 @@
+# Deploy on: frontend node
+# Serves the SPA and proxies /api + /lsp to abaper on the apps node
+services:
+  abaper-editor:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - ABAPER_HOST=${ABAPER_HOST:?Set ABAPER_HOST to the apps node address}
+      - ABAPER_PORT=${ABAPER_PORT:-8080}
+      - ABAPER_LSP_PORT=${ABAPER_LSP_PORT:-8089}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
