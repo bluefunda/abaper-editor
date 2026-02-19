@@ -3,7 +3,7 @@
 services:
   abaper:
     image: bluefunda/abaper:latest
-    command: abaper --server -p 8080
+    command: ["./abaper", "server", "-p", "8080"]
     ports:
       - "8080:8080"
       - "8089:8089"
