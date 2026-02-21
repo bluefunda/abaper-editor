@@ -132,6 +132,37 @@ export async function syntaxCheck(
 
 // --- GitHub API ---
 
+import { getGitHubToken } from './github-auth';
+
+async function fetchGitHubJSON<T>(path: string, options?: RequestInit): Promise<T> {
+  await refreshToken();
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const realm = getRealm();
+  if (realm) {
+    headers['X-Realm'] = realm;
+  }
+  const ghToken = getGitHubToken();
+  if (ghToken) {
+    headers['X-GitHub-Token'] = ghToken;
+  }
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers,
+    ...options,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export interface GitHubBranch {
   name: string;
   protected: boolean;
@@ -152,11 +183,28 @@ export interface GitHubFileContent {
   size: number;
 }
 
+export async function githubExchangeCode(
+  code: string,
+): Promise<{ access_token: string; username: string }> {
+  const res = await fetchJSON<APIResponse<{ access_token: string; username: string }>>('/api/v1/github/oauth/callback', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+  return res.data;
+}
+
+export async function githubGetUser(): Promise<{ login: string; name: string; avatar_url: string }> {
+  const res = await fetchGitHubJSON<APIResponse<{ login: string; name: string; avatar_url: string }>>('/api/v1/github/user', {
+    method: 'POST',
+  });
+  return res.data;
+}
+
 export async function githubListBranches(
   owner: string,
   repo: string,
 ): Promise<GitHubBranch[]> {
-  const res = await fetchJSON<APIResponse<GitHubBranch[]>>('/api/v1/github/branches', {
+  const res = await fetchGitHubJSON<APIResponse<GitHubBranch[]>>('/api/v1/github/branches', {
     method: 'POST',
     body: JSON.stringify({ owner, repo }),
   });
@@ -169,7 +217,7 @@ export async function githubListTree(
   path: string,
   branch?: string,
 ): Promise<GitHubContent[]> {
-  const res = await fetchJSON<APIResponse<GitHubContent[]>>('/api/v1/github/tree', {
+  const res = await fetchGitHubJSON<APIResponse<GitHubContent[]>>('/api/v1/github/tree', {
     method: 'POST',
     body: JSON.stringify({ owner, repo, path, branch }),
   });
@@ -182,7 +230,7 @@ export async function githubGetFile(
   path: string,
   branch?: string,
 ): Promise<GitHubFileContent> {
-  const res = await fetchJSON<APIResponse<GitHubFileContent>>('/api/v1/github/file', {
+  const res = await fetchGitHubJSON<APIResponse<GitHubFileContent>>('/api/v1/github/file', {
     method: 'POST',
     body: JSON.stringify({ owner, repo, path, branch }),
   });
