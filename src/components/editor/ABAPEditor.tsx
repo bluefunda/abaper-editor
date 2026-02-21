@@ -32,7 +32,7 @@ export function ABAPEditor({ onCursorChange }: ABAPEditorProps) {
     [baseOnMount, onCursorChange],
   );
 
-  // Switch model when active tab changes
+  // Switch model when active tab changes or editor mounts
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor || !activeTab) return;
@@ -41,7 +41,7 @@ export function ABAPEditor({ onCursorChange }: ABAPEditorProps) {
     if (currentModel !== activeTab.model) {
       editor.setModel(activeTab.model);
     }
-  }, [activeTab, editorRef]);
+  }, [activeTab, editorRef, mounted]);
 
   // Use abaplint
   useAbaplint(mounted ? editorRef.current : null);
