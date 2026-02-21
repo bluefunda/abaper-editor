@@ -6,15 +6,17 @@ interface BottomPanelProps {
   problemsContent: React.ReactNode;
   outputContent: React.ReactNode;
   transpilerContent: React.ReactNode;
+  aiContent: React.ReactNode;
 }
 
 const panelTabs: { id: BottomPanelTab; label: string }[] = [
   { id: 'problems', label: 'Problems' },
   { id: 'output', label: 'Output' },
   { id: 'transpiler', label: 'Transpiler' },
+  { id: 'ai', label: 'AI Assistant' },
 ];
 
-export function BottomPanel({ problemsContent, outputContent, transpilerContent }: BottomPanelProps) {
+export function BottomPanel({ problemsContent, outputContent, transpilerContent, aiContent }: BottomPanelProps) {
   const { bottomPanelVisible, bottomPanelTab, setBottomPanelTab, toggleBottomPanel } =
     useSettingsStore();
 
@@ -24,6 +26,7 @@ export function BottomPanel({ problemsContent, outputContent, transpilerContent 
     problems: problemsContent,
     output: outputContent,
     transpiler: transpilerContent,
+    ai: aiContent,
   };
 
   return (

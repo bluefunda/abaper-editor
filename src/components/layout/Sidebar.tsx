@@ -1,4 +1,4 @@
-import { FolderOpen, Search } from 'lucide-react';
+import { FolderOpen, Search, GitBranch } from 'lucide-react';
 import { useSettingsStore, type SidebarPanel } from '../../stores/settingsStore';
 import { Icon } from '../common/Icon';
 
@@ -9,6 +9,7 @@ interface SidebarProps {
 const sidebarItems: { id: SidebarPanel; icon: typeof FolderOpen; title: string }[] = [
   { id: 'explorer', icon: FolderOpen, title: 'Explorer' },
   { id: 'search', icon: Search, title: 'Search' },
+  { id: 'git', icon: GitBranch, title: 'Git' },
 ];
 
 export function Sidebar({ children }: SidebarProps) {
@@ -42,7 +43,7 @@ export function Sidebar({ children }: SidebarProps) {
       {/* Panel area */}
       <div className="w-60 bg-sidebar-bg border-r border-panel-border flex flex-col overflow-hidden">
         <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-fg/60">
-          {sidebarPanel === 'explorer' ? 'Explorer' : 'Search'}
+          {sidebarPanel === 'explorer' ? 'Explorer' : sidebarPanel === 'search' ? 'Search' : 'Git'}
         </div>
         <div className="flex-1 overflow-auto">{children}</div>
       </div>
