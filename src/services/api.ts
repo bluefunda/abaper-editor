@@ -11,6 +11,12 @@ export function getBaseUrl(): string {
   return BASE_URL;
 }
 
+interface APIResponse<T> {
+  success: boolean;
+  data: T;
+  error?: string;
+}
+
 async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
   await refreshToken();
   const token = getToken();
@@ -40,31 +46,44 @@ export function healthCheck(): Promise<{ status: string }> {
   return fetchJSON('/health');
 }
 
-export function getObject(
+export async function getObject(
   type: string,
   name: string,
   functionGroup?: string,
 ): Promise<ADTSourceCode> {
-  const params = new URLSearchParams({ type, name });
-  if (functionGroup) params.set('functionGroup', functionGroup);
-  return fetchJSON(`/api/v1/objects/get?${params}`);
+  // Strip ADT subtype (e.g. "CLAS/OC" → "CLAS")
+  const baseType = type.split('/')[0] ?? type;
+  const body: Record<string, string> = { object_type: baseType, object_name: name };
+  if (functionGroup) body.function_group = functionGroup;
+  const res = await fetchJSON<APIResponse<ADTSourceCode>>('/api/v1/objects/get', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return res.data;
 }
 
-export function searchObjects(
+export async function searchObjects(
   pattern: string,
   types?: string,
 ): Promise<ADTObject[]> {
-  const params = new URLSearchParams({ pattern });
-  if (types) params.set('types', types);
-  return fetchJSON(`/api/v1/objects/search?${params}`);
+  const body: Record<string, string> = { object_name: pattern };
+  if (types) body.object_type = types;
+  const res = await fetchJSON<APIResponse<{ Objects: ADTObject[] }>>('/api/v1/objects/search', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return res.data?.Objects ?? [];
 }
 
-export function listPackages(pattern: string): Promise<ADTObject[]> {
-  const params = new URLSearchParams({ type: 'packages', pattern });
-  return fetchJSON(`/api/v1/objects/list?${params}`);
+export async function listPackages(pattern: string): Promise<ADTObject[]> {
+  const res = await fetchJSON<APIResponse<ADTObject[]>>('/api/v1/objects/list', {
+    method: 'POST',
+    body: JSON.stringify({ object_name: pattern, object_type: 'packages' }),
+  });
+  return res.data ?? [];
 }
 
-export function saveObject(
+export async function saveObject(
   objectName: string,
   objectType: string,
   source: string,
@@ -81,25 +100,26 @@ export function saveObject(
   });
 }
 
-export function activateObject(
+export async function activateObject(
   objectName: string,
   objectType: string,
 ): Promise<ActivationResult> {
-  return fetchJSON('/api/v1/activate', {
+  const res = await fetchJSON<APIResponse<ActivationResult>>('/api/v1/activate', {
     method: 'POST',
     body: JSON.stringify({
       object_name: objectName,
       object_type: objectType,
     }),
   });
+  return res.data;
 }
 
-export function syntaxCheck(
+export async function syntaxCheck(
   objectName: string,
   objectType: string,
   source: string,
 ): Promise<SyntaxCheckResult> {
-  return fetchJSON('/api/v1/syntax-check', {
+  const res = await fetchJSON<APIResponse<SyntaxCheckResult>>('/api/v1/syntax-check', {
     method: 'POST',
     body: JSON.stringify({
       object_name: objectName,
@@ -107,4 +127,5 @@ export function syntaxCheck(
       source,
     }),
   });
+  return res.data;
 }
