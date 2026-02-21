@@ -15,6 +15,35 @@ export function normalizeObjectType(type: string): ABAPObjectType {
   return ADT_TYPE_MAP[type.toUpperCase()] ?? ADT_TYPE_MAP[type.split('/')[0]?.toUpperCase() ?? ''] ?? 'program';
 }
 
+const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
+  '.ts': 'typescript', '.tsx': 'typescript',
+  '.js': 'javascript', '.jsx': 'javascript',
+  '.go': 'go',
+  '.py': 'python',
+  '.rs': 'rust',
+  '.java': 'java',
+  '.json': 'json',
+  '.yaml': 'yaml', '.yml': 'yaml',
+  '.xml': 'xml',
+  '.html': 'html',
+  '.css': 'css',
+  '.scss': 'scss',
+  '.md': 'markdown',
+  '.sql': 'sql',
+  '.sh': 'shell', '.bash': 'shell',
+  '.dockerfile': 'dockerfile',
+  '.abap': 'abap',
+  '.toml': 'toml',
+};
+
+function inferLanguage(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower === 'dockerfile') return 'dockerfile';
+  const dotIdx = lower.lastIndexOf('.');
+  if (dotIdx === -1) return 'plaintext';
+  return EXTENSION_LANGUAGE_MAP[lower.slice(dotIdx)] ?? 'plaintext';
+}
+
 function objectTypeToExtension(type: ABAPObjectType): string {
   switch (type) {
     case 'program': return '.prog.abap';
@@ -33,6 +62,7 @@ interface EditorState {
   outputLog: string[];
 
   openTab: (objectName: string, objectType: ABAPObjectType, source: string, etag: string, functionGroup?: string) => void;
+  openReadOnlyTab: (name: string, content: string, language?: string) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   markDirty: (id: string, dirty: boolean) => void;
@@ -70,6 +100,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       isDirty: false,
       etag,
       functionGroup,
+    };
+
+    set((state) => ({
+      tabs: [...state.tabs, tab],
+      activeTabId: id,
+    }));
+  },
+
+  openReadOnlyTab: (name, content, language) => {
+    const id = `github:${name}`;
+    const existing = get().tabs.find((t) => t.id === id);
+    if (existing) {
+      set({ activeTabId: existing.id });
+      return;
+    }
+
+    const lang = language ?? inferLanguage(name);
+    const uri = monaco.Uri.parse(`inmemory://github/${name}`);
+    const model = monaco.editor.createModel(content, lang, uri);
+
+    const tab: TabState = {
+      id,
+      objectName: name,
+      objectType: 'program',
+      model,
+      isDirty: false,
+      etag: '',
+      readOnly: true,
+      source: 'github',
     };
 
     set((state) => ({
