@@ -1,24 +1,20 @@
-import { useState, useCallback } from 'react';
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen, GitBranch } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { ChevronRight, ChevronDown, File, Folder, FolderOpen, GitBranch, Github, LogOut } from 'lucide-react';
 import { useGitHubExplorerStore, type TreeNode } from '../../stores/githubExplorerStore';
 import { useGitHubExplorer } from '../../hooks/useGitHubExplorer';
+import { isGitHubConnected, getGitHubUsername, startGitHubOAuth, clearGitHubAuth, handleOAuthCallback } from '../../services/github-auth';
+import { githubExchangeCode } from '../../services/api';
 import { Icon } from '../common/Icon';
 import { Spinner } from '../common/Spinner';
 
 function TreeNodeItem({
   node,
-  owner,
-  repo,
-  branch,
   expandedPaths,
   onToggle,
   onFileOpen,
   depth,
 }: {
   node: TreeNode;
-  owner: string;
-  repo: string;
-  branch: string;
   expandedPaths: string[];
   onToggle: (path: string) => void;
   onFileOpen: (path: string) => void;
@@ -70,9 +66,6 @@ function TreeNodeItem({
               <TreeNodeItem
                 key={child.path}
                 node={child}
-                owner={owner}
-                repo={repo}
-                branch={branch}
                 expandedPaths={expandedPaths}
                 onToggle={onToggle}
                 onFileOpen={onFileOpen}
@@ -101,6 +94,28 @@ export function GitHubExplorerPanel() {
   const { fetchBranches, fetchDirectory, fetchFileContent } = useGitHubExplorer();
 
   const [repoInput, setRepoInput] = useState(selectedRepo);
+  const [connected, setConnected] = useState(isGitHubConnected());
+  const [ghUsername, setGhUsername] = useState(getGitHubUsername());
+
+  // Handle OAuth callback on mount
+  useEffect(() => {
+    handleOAuthCallback(githubExchangeCode).then((handled) => {
+      if (handled) {
+        setConnected(true);
+        setGhUsername(getGitHubUsername());
+      }
+    });
+  }, []);
+
+  const handleConnect = useCallback(() => {
+    startGitHubOAuth();
+  }, []);
+
+  const handleDisconnect = useCallback(() => {
+    clearGitHubAuth();
+    setConnected(false);
+    setGhUsername(null);
+  }, []);
 
   const splitRepo = (fullName: string): [string, string] => {
     const parts = fullName.split('/');
@@ -128,10 +143,8 @@ export function GitHubExplorerPanel() {
     async (path: string) => {
       toggleExpanded(path);
 
-      // If expanding and children not loaded yet, fetch
       const expanded = expandedPaths.includes(path);
       if (!expanded) {
-        // We're about to expand — check if children are loaded
         const findNode = (nodes: TreeNode[], target: string): TreeNode | undefined => {
           for (const n of nodes) {
             if (n.path === target) return n;
@@ -160,18 +173,39 @@ export function GitHubExplorerPanel() {
     [selectedRepo, currentBranch, fetchFileContent],
   );
 
-  // Load root tree when branch is set and tree is empty
   const handleLoadRoot = useCallback(async () => {
     if (!selectedRepo || !currentBranch) return;
     const [owner, repo] = splitRepo(selectedRepo);
     await fetchDirectory(owner, repo, '', currentBranch);
   }, [selectedRepo, currentBranch, fetchDirectory]);
 
-  // Split for rendering
-  const [owner, repo] = splitRepo(selectedRepo);
-
   return (
     <div className="flex flex-col h-full text-xs">
+      {/* GitHub connection status */}
+      <div className="px-2 pb-2">
+        {connected ? (
+          <div className="flex items-center gap-2 px-2 py-1.5 bg-editor-bg rounded border border-panel-border">
+            <Icon icon={Github} size={14} className="text-green-400 shrink-0" />
+            <span className="flex-1 truncate text-editor-fg">{ghUsername ?? 'Connected'}</span>
+            <button
+              className="text-sidebar-fg/40 hover:text-error shrink-0"
+              onClick={handleDisconnect}
+              title="Disconnect GitHub"
+            >
+              <Icon icon={LogOut} size={13} />
+            </button>
+          </div>
+        ) : (
+          <button
+            className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-editor-fg rounded py-2 transition-colors"
+            onClick={handleConnect}
+          >
+            <Icon icon={Github} size={15} />
+            Connect GitHub
+          </button>
+        )}
+      </div>
+
       {/* Repo input */}
       <div className="px-2 pb-2">
         <div className="flex items-center gap-1 bg-editor-bg rounded border border-panel-border">
@@ -206,7 +240,7 @@ export function GitHubExplorerPanel() {
         </div>
       )}
 
-      {/* Load root button (shown when branch selected but no tree) */}
+      {/* Load root button */}
       {selectedRepo && currentBranch && tree.length === 0 && !loading && (
         <div className="px-3 py-2">
           <button
@@ -232,9 +266,6 @@ export function GitHubExplorerPanel() {
           <TreeNodeItem
             key={node.path}
             node={node}
-            owner={owner}
-            repo={repo}
-            branch={currentBranch}
             expandedPaths={expandedPaths}
             onToggle={handleToggle}
             onFileOpen={handleFileOpen}
@@ -246,7 +277,9 @@ export function GitHubExplorerPanel() {
       {/* Empty state */}
       {!selectedRepo && !loading && (
         <div className="px-3 py-4 text-center text-sidebar-fg/30">
-          Enter a repository (e.g. owner/repo) to browse files.
+          {connected
+            ? 'Enter a repository (e.g. owner/repo) to browse files.'
+            : 'Connect your GitHub account to browse repositories.'}
         </div>
       )}
     </div>
