@@ -2,6 +2,19 @@ import { create } from 'zustand';
 import * as monaco from 'monaco-editor';
 import type { TabState, DiagnosticItem, ABAPObjectType } from '../types/editor';
 
+const ADT_TYPE_MAP: Record<string, ABAPObjectType> = {
+  'PROG': 'program', 'PROG/P': 'program',
+  'CLAS': 'class', 'CLAS/OC': 'class',
+  'INTF': 'interface', 'INTF/OI': 'interface',
+  'FUGR': 'function', 'FUGR/F': 'function',
+  'TABL': 'table', 'TABL/DT': 'table',
+  'STRU': 'structure',
+};
+
+export function normalizeObjectType(type: string): ABAPObjectType {
+  return ADT_TYPE_MAP[type.toUpperCase()] ?? ADT_TYPE_MAP[type.split('/')[0]?.toUpperCase() ?? ''] ?? 'program';
+}
+
 function objectTypeToExtension(type: ABAPObjectType): string {
   switch (type) {
     case 'program': return '.prog.abap';

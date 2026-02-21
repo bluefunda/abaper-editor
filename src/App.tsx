@@ -23,7 +23,7 @@ import { useSAPConnection } from './hooks/useSAPConnection';
 import { useAIAssistant } from './hooks/useAIAssistant';
 import { saveObject, activateObject, syntaxCheck, getObject } from './services/api';
 import { initMCP } from './services/mcp';
-import type { ABAPObjectType } from './types/editor';
+import { normalizeObjectType } from './stores/editorStore';
 
 export default function App() {
   const theme = useSettingsStore((s) => s.theme);
@@ -140,7 +140,7 @@ export default function App() {
         const source = await getObject(type, name);
         openTab(
           source.object_name,
-          source.object_type as ABAPObjectType,
+          normalizeObjectType(source.object_type),
           source.source,
           source.etag,
         );

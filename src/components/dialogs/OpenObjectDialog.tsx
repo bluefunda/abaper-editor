@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { searchObjects, getObject } from '../../services/api';
-import { useEditorStore } from '../../stores/editorStore';
+import { useEditorStore, normalizeObjectType } from '../../stores/editorStore';
 import { Spinner } from '../common/Spinner';
 import type { ADTObject } from '../../types/adt';
-import type { ABAPObjectType } from '../../types/editor';
 
 interface OpenObjectDialogProps {
   open: boolean;
@@ -58,7 +57,7 @@ export function OpenObjectDialog({ open, onClose }: OpenObjectDialogProps) {
       const source = await getObject(obj.type, obj.name);
       openTab(
         source.object_name,
-        source.object_type as ABAPObjectType,
+        normalizeObjectType(source.object_type),
         source.source,
         source.etag,
       );
