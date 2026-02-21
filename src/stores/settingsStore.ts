@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type Theme = 'dark' | 'light';
-export type SidebarPanel = 'explorer' | 'search' | 'git';
+export type SidebarPanel = 'explorer' | 'search' | 'git' | 'github';
 export type BottomPanelTab = 'problems' | 'output' | 'transpiler' | 'ai';
 
 interface SettingsState {

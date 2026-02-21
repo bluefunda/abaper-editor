@@ -12,6 +12,7 @@ import { OutputPanel } from './components/panels/OutputPanel';
 import { TranspilerPanel } from './components/panels/TranspilerPanel';
 import { AIPanel } from './components/panels/AIPanel';
 import { GitPanel } from './components/panels/GitPanel';
+import { GitHubExplorerPanel } from './components/panels/GitHubExplorerPanel';
 import { OpenObjectDialog } from './components/dialogs/OpenObjectDialog';
 import { ConnectionDialog } from './components/dialogs/ConnectionDialog';
 import { NewObjectDialog } from './components/dialogs/NewObjectDialog';
@@ -256,6 +257,8 @@ export default function App() {
         return <SearchPanel onOpenObject={handleOpenObject} />;
       case 'git':
         return <GitPanel />;
+      case 'github':
+        return <GitHubExplorerPanel />;
     }
   })();
 

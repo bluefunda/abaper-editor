@@ -129,3 +129,62 @@ export async function syntaxCheck(
   });
   return res.data;
 }
+
+// --- GitHub API ---
+
+export interface GitHubBranch {
+  name: string;
+  protected: boolean;
+}
+
+export interface GitHubContent {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  size?: number;
+}
+
+export interface GitHubFileContent {
+  name: string;
+  path: string;
+  content: string;
+  encoding: string;
+  size: number;
+}
+
+export async function githubListBranches(
+  owner: string,
+  repo: string,
+): Promise<GitHubBranch[]> {
+  const res = await fetchJSON<APIResponse<GitHubBranch[]>>('/api/v1/github/branches', {
+    method: 'POST',
+    body: JSON.stringify({ owner, repo }),
+  });
+  return res.data ?? [];
+}
+
+export async function githubListTree(
+  owner: string,
+  repo: string,
+  path: string,
+  branch?: string,
+): Promise<GitHubContent[]> {
+  const res = await fetchJSON<APIResponse<GitHubContent[]>>('/api/v1/github/tree', {
+    method: 'POST',
+    body: JSON.stringify({ owner, repo, path, branch }),
+  });
+  return res.data ?? [];
+}
+
+export async function githubGetFile(
+  owner: string,
+  repo: string,
+  path: string,
+  branch?: string,
+): Promise<GitHubFileContent> {
+  const res = await fetchJSON<APIResponse<GitHubFileContent>>('/api/v1/github/file', {
+    method: 'POST',
+    body: JSON.stringify({ owner, repo, path, branch }),
+  });
+  return res.data;
+}

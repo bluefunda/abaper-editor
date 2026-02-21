@@ -85,6 +85,7 @@ export function ABAPEditor({ onCursorChange }: ABAPEditorProps) {
           wordWrap: 'off',
           tabSize: 2,
           automaticLayout: true,
+          readOnly: activeTab?.readOnly ?? false,
         }}
       />
     </div>

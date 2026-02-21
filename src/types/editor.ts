@@ -10,6 +10,8 @@ export interface TabState {
   isDirty: boolean;
   etag: string;
   functionGroup?: string;
+  readOnly?: boolean;
+  source?: 'sap' | 'github';
 }
 
 export interface DiagnosticItem {
