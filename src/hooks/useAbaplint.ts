@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor';
 import { lintABAP } from '../services/abaplint';
 import { useEditorStore } from '../stores/editorStore';
-import { useConnectionStore } from '../stores/connectionStore';
 import type { DiagnosticItem } from '../types/editor';
 
 function severityToMonaco(sev: DiagnosticItem['severity']): monaco.MarkerSeverity {
@@ -24,9 +23,6 @@ export function useAbaplint(editor: monaco.editor.IStandaloneCodeEditor | null) 
     const runLint = () => {
       const model = editor.getModel();
       if (!model) return;
-
-      const offlineLinting = useConnectionStore.getState().offlineLinting;
-      if (!offlineLinting) return;
 
       const source = model.getValue();
       const filename = model.uri.path.split('/').pop() ?? 'source.prog.abap';
