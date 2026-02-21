@@ -8,6 +8,11 @@ interface MenuBarProps {
   onSyntaxCheck: () => void;
   onConnectionDialog: () => void;
   onNewObject: () => void;
+  onAIReview?: () => void;
+  onAIS4Check?: () => void;
+  onAIExplain?: () => void;
+  onAIRunTests?: () => void;
+  onAIClear?: () => void;
 }
 
 interface MenuItem {
@@ -29,6 +34,11 @@ export function MenuBar({
   onSyntaxCheck,
   onConnectionDialog,
   onNewObject,
+  onAIReview,
+  onAIS4Check,
+  onAIExplain,
+  onAIRunTests,
+  onAIClear,
 }: MenuBarProps) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuBarRef = useRef<HTMLDivElement>(null);
@@ -61,6 +71,17 @@ export function MenuBar({
         { label: 'Syntax Check', action: onSyntaxCheck, shortcut: 'Ctrl+Shift+B' },
         { separator: true, label: '' },
         { label: 'Connection Settings...', action: onConnectionDialog },
+      ],
+    },
+    {
+      label: 'AI',
+      items: [
+        { label: 'Review Code', action: onAIReview, shortcut: 'Ctrl+Shift+R' },
+        { label: 'S/4HANA Check', action: onAIS4Check, shortcut: 'Ctrl+Shift+4' },
+        { label: 'Explain Code', action: onAIExplain },
+        { label: 'Run Unit Tests', action: onAIRunTests },
+        { separator: true, label: '' },
+        { label: 'Clear AI Panel', action: onAIClear },
       ],
     },
     {

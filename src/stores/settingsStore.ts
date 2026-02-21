@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type Theme = 'dark' | 'light';
-export type SidebarPanel = 'explorer' | 'search';
-export type BottomPanelTab = 'problems' | 'output' | 'transpiler';
+export type SidebarPanel = 'explorer' | 'search' | 'git';
+export type BottomPanelTab = 'problems' | 'output' | 'transpiler' | 'ai';
 
 interface SettingsState {
   theme: Theme;
