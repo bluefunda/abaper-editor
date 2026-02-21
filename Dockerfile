@@ -4,6 +4,8 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 ENV NODE_OPTIONS="--max-old-space-size=4096"
+ARG VITE_GITHUB_CLIENT_ID
+ENV VITE_GITHUB_CLIENT_ID=${VITE_GITHUB_CLIENT_ID}
 RUN npm run build
 
 FROM nginx:alpine
