@@ -43,7 +43,9 @@ export async function initAuth(): Promise<boolean> {
 
   keycloak.onTokenExpired = () => {
     keycloak!.updateToken(30).catch(() => {
-      keycloak!.login();
+      // Token refresh failed — next API call will get a 401
+      // Don't force a redirect here; let the user continue working
+      console.warn('Token refresh failed; session may have expired');
     });
   };
 
@@ -76,7 +78,7 @@ export async function refreshToken(): Promise<boolean> {
   try {
     return await keycloak.updateToken(30);
   } catch {
-    keycloak.login();
+    // Don't redirect mid-API-call — let the caller handle the 401
     return false;
   }
 }

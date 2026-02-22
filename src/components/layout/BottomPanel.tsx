@@ -1,4 +1,5 @@
 import { useSettingsStore, type BottomPanelTab } from '../../stores/settingsStore';
+import { useResizable } from '../../hooks/useResizable';
 import { ChevronDown } from 'lucide-react';
 import { Icon } from '../common/Icon';
 
@@ -6,31 +7,42 @@ interface BottomPanelProps {
   problemsContent: React.ReactNode;
   outputContent: React.ReactNode;
   transpilerContent: React.ReactNode;
-  aiContent: React.ReactNode;
 }
 
 const panelTabs: { id: BottomPanelTab; label: string }[] = [
   { id: 'problems', label: 'Problems' },
   { id: 'output', label: 'Output' },
   { id: 'transpiler', label: 'Transpiler' },
-  { id: 'ai', label: 'AI Assistant' },
 ];
 
-export function BottomPanel({ problemsContent, outputContent, transpilerContent, aiContent }: BottomPanelProps) {
-  const { bottomPanelVisible, bottomPanelTab, setBottomPanelTab, toggleBottomPanel } =
+export function BottomPanel({ problemsContent, outputContent, transpilerContent }: BottomPanelProps) {
+  const { bottomPanelVisible, bottomPanelTab, bottomPanelHeight, setBottomPanelTab, setBottomPanelHeight, toggleBottomPanel } =
     useSettingsStore();
+
+  const { onMouseDown } = useResizable({
+    direction: 'vertical',
+    initialSize: bottomPanelHeight,
+    min: 100,
+    max: 600,
+    reverse: true,
+    onResize: setBottomPanelHeight,
+  });
 
   if (!bottomPanelVisible) return null;
 
-  const content = {
+  const content: Record<BottomPanelTab, React.ReactNode> = {
     problems: problemsContent,
     output: outputContent,
     transpiler: transpilerContent,
-    ai: aiContent,
   };
 
   return (
-    <div className="flex flex-col border-t border-panel-border bg-panel-bg h-[200px] shrink-0">
+    <div className="flex flex-col border-t border-panel-border bg-panel-bg shrink-0" style={{ height: bottomPanelHeight }}>
+      {/* Drag handle */}
+      <div
+        className="h-1 cursor-row-resize hover:bg-accent shrink-0 transition-colors"
+        onMouseDown={onMouseDown}
+      />
       <div className="flex items-center h-8 border-b border-panel-border shrink-0 px-2">
         <div className="flex items-center gap-0 flex-1">
           {panelTabs.map((tab) => (

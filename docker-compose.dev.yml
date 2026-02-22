@@ -1,0 +1,58 @@
+# Local development — backends + gateway in Docker, MCP + frontend run natively
+#
+# Usage:
+#   cp .env.template .env.dev                        # fill in credentials
+#   docker compose -f docker-compose.dev.yml up      # backends + gateway
+#   source .env.dev && ABAPER_MODE=sse abaper-mcp    # MCP server (port 8015)
+#   LOCAL_GW=1 npm run dev                           # frontend with HMR
+
+services:
+  # TypeScript backend — SAP ADT operations (via abap-adt-api)
+  abaper-ts:
+    build:
+      context: ../../src/abaper-ts
+    ports:
+      - "8085:8080"
+    env_file: .env.dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Go backend — GitHub proxy + misc non-ADT services
+  abaper:
+    image: bluefunda/abaper:beta
+    platform: linux/amd64
+    command: ["./abaper", "server", "-p", "8080"]
+    ports:
+      - "8080:8080"
+      - "8089:8089"
+    env_file: .env.dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  gateway:
+    build:
+      context: ../../src/abaper-gw
+    ports:
+      - "8083:8083"
+    environment:
+      ENV: compose
+      DOMAIN: localhost
+      CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:5174"
+    volumes:
+      - ./config/krakend-compose.json:/etc/krakend/settings/compose/service.json:ro
+    depends_on:
+      abaper-ts:
+        condition: service_healthy
+      abaper:
+        condition: service_healthy
+
+  # abaper-mcp: run natively (binary at ~/src/abaper-mcp/abaper-mcp)
+  # source .env.dev && ABAPER_MODE=sse ABAPER_HTTP_PORT=8015 ~/src/abaper-mcp/abaper-mcp

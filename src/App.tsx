@@ -3,6 +3,7 @@ import { MenuBar } from './components/layout/MenuBar';
 import { Sidebar } from './components/layout/Sidebar';
 import { TabBar } from './components/layout/TabBar';
 import { BottomPanel } from './components/layout/BottomPanel';
+import { RightPanel } from './components/layout/RightPanel';
 import { StatusBar } from './components/layout/StatusBar';
 import { ABAPEditor } from './components/editor/ABAPEditor';
 import { ExplorerPanel } from './components/panels/ExplorerPanel';
@@ -31,7 +32,7 @@ export default function App() {
   const sidebarPanel = useSettingsStore((s) => s.sidebarPanel);
   const toggleSidebar = useSettingsStore((s) => s.toggleSidebar);
   const toggleBottomPanel = useSettingsStore((s) => s.toggleBottomPanel);
-  const setBottomPanelTab = useSettingsStore((s) => s.setBottomPanelTab);
+  const toggleRightPanel = useSettingsStore((s) => s.toggleRightPanel);
 
   const [openObjectDialogOpen, setOpenObjectDialogOpen] = useState(false);
   const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
@@ -158,15 +159,15 @@ export default function App() {
     editorRef.current?.revealLineInCenter(line);
   }, []);
 
-  // AI action helpers — get active tab context and switch to AI panel
+  // AI action helpers — get active tab context and open right panel
   const withActiveTab = useCallback(
     (action: (objectType: string, objectName: string) => void) => {
       const tab = useEditorStore.getState().getActiveTab();
       if (!tab) return;
-      setBottomPanelTab('ai');
+      useSettingsStore.setState({ rightPanelVisible: true });
       action(tab.objectType, tab.objectName);
     },
-    [setBottomPanelTab],
+    [],
   );
 
   const handleAIReview = useCallback(() => {
@@ -180,9 +181,9 @@ export default function App() {
   const handleAIExplain = useCallback(() => {
     const tab = useEditorStore.getState().getActiveTab();
     if (!tab) return;
-    setBottomPanelTab('ai');
+    useSettingsStore.setState({ rightPanelVisible: true });
     explainCode(tab.model.getValue());
-  }, [setBottomPanelTab, explainCode]);
+  }, [explainCode]);
 
   const handleAIRunTests = useCallback(() => {
     withActiveTab((type, name) => runTests(type, name));
@@ -225,6 +226,10 @@ export default function App() {
         e.preventDefault();
         toggleBottomPanel();
       }
+      if (mod && e.key === 'l' && !e.shiftKey) {
+        e.preventDefault();
+        toggleRightPanel();
+      }
       if (mod && e.key === 'n' && !e.shiftKey) {
         e.preventDefault();
         setNewObjectDialogOpen(true);
@@ -242,7 +247,7 @@ export default function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSave, handleActivate, handleSyntaxCheck, toggleSidebar, toggleBottomPanel, handleAIReview, handleAIS4Check]);
+  }, [handleSave, handleActivate, handleSyntaxCheck, toggleSidebar, toggleBottomPanel, toggleRightPanel, handleAIReview, handleAIS4Check]);
 
   // Apply theme class on <html>
   useEffect(() => {
@@ -288,18 +293,19 @@ export default function App() {
             problemsContent={<ProblemsPanel onNavigate={handleNavigateToLine} />}
             outputContent={<OutputPanel />}
             transpilerContent={<TranspilerPanel />}
-            aiContent={
-              <AIPanel
-                onReview={handleAIReview}
-                onS4Check={handleAIS4Check}
-                onExplain={handleAIExplain}
-                onRunTests={handleAIRunTests}
-                onOptimize={handleAIOptimize}
-                onNavigateToLine={handleNavigateToLine}
-              />
-            }
           />
         </div>
+
+        <RightPanel>
+          <AIPanel
+            onReview={handleAIReview}
+            onS4Check={handleAIS4Check}
+            onExplain={handleAIExplain}
+            onRunTests={handleAIRunTests}
+            onOptimize={handleAIOptimize}
+            onNavigateToLine={handleNavigateToLine}
+          />
+        </RightPanel>
       </div>
 
       <StatusBar cursorLine={cursorLine} cursorColumn={cursorColumn} />

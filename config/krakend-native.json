@@ -1,0 +1,25 @@
+{
+  "port": 8083,
+  "timeout": "60s",
+  "cache_ttl": "0s",
+  "backend_host": "http://host.docker.internal:8080",
+  "jwk_url": "https://jwks.bluefunda.com/combined-jwk",
+  "cors": {
+    "allow_origins": ["http://localhost:5173", "http://localhost:5174"],
+    "allow_methods": ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_credentials": true,
+    "allow_headers": [
+      "Origin",
+      "Authorization",
+      "Content-Type",
+      "Accept",
+      "X-Requested-With",
+      "X-Realm",
+      "X-GitHub-Token"
+    ],
+    "expose_headers": [
+      "Content-Length",
+      "Content-Type"
+    ]
+  }
+}

@@ -34,7 +34,7 @@ export function useGitHubExplorer() {
           name: item.name,
           path: item.path,
           type: item.type,
-          children: item.type === 'dir' ? undefined : undefined,
+          children: item.type === 'dir' ? undefined : [],
         }))
         .sort((a, b) => {
           if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;

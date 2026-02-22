@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { FolderOpen, Search, GitBranch, Github, LogOut } from 'lucide-react';
+import { FolderOpen, Search, GitBranch, Github, LogOut, Bot } from 'lucide-react';
 import { useSettingsStore, type SidebarPanel } from '../../stores/settingsStore';
 import { getUsername, getRealm, logout } from '../../services/auth';
 import { Icon } from '../common/Icon';
@@ -75,7 +75,7 @@ function UserMenu() {
 }
 
 export function Sidebar({ children }: SidebarProps) {
-  const { sidebarVisible, sidebarPanel, setSidebarPanel, toggleSidebar } = useSettingsStore();
+  const { sidebarVisible, sidebarPanel, setSidebarPanel, toggleSidebar, rightPanelVisible, toggleRightPanel } = useSettingsStore();
 
   if (!sidebarVisible) return null;
 
@@ -101,6 +101,17 @@ export function Sidebar({ children }: SidebarProps) {
             <Icon icon={item.icon} size={20} />
           </button>
         ))}
+
+        {/* AI Assistant toggle */}
+        <button
+          className={`w-10 h-10 flex items-center justify-center rounded hover:bg-white/10 ${
+            rightPanelVisible ? 'text-accent' : 'text-sidebar-fg/60'
+          }`}
+          onClick={toggleRightPanel}
+          title="AI Assistant (Ctrl+L)"
+        >
+          <Icon icon={Bot} size={20} />
+        </button>
 
         {/* Spacer pushes user menu to bottom */}
         <div className="flex-1" />
