@@ -1,16 +1,14 @@
-# Local development — backends + gateway in Docker, MCP + frontend run natively
+# Local development — all backends + gateway + MCP in Docker, frontend runs natively
 #
 # Usage:
 #   cp .env.template .env.dev                        # fill in credentials
-#   docker compose -f docker-compose.dev.yml up      # backends + gateway
-#   source .env.dev && ABAPER_MODE=sse abaper-mcp    # MCP server (port 8015)
+#   docker compose -f docker-compose.dev.yml up      # all services
 #   LOCAL_GW=1 npm run dev                           # frontend with HMR
 
 services:
   # TypeScript backend — SAP ADT operations (via abap-adt-api)
   abaper-ts:
-    build:
-      context: ../../src/abaper-ts
+    image: abaper-ts:beta
     ports:
       - "8085:8080"
     env_file: .env.dev
@@ -37,6 +35,27 @@ services:
       retries: 3
       start_period: 5s
 
+  # MCP server — AI tool interface, calls abaper-ts for ADT
+  abaper-mcp:
+    image: abaper-mcp:beta
+    ports:
+      - "8015:8015"
+    environment:
+      ABAPER_MODE: sse
+      ABAPER_TS_URL: http://abaper-ts:8080
+      ABAPER_HTTP_PORT: "8015"
+      LOG_LEVEL: info
+      LOG_FORMAT: console
+    depends_on:
+      abaper-ts:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8015/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
   gateway:
     build:
       context: ../../src/abaper-gw
@@ -53,6 +72,3 @@ services:
         condition: service_healthy
       abaper:
         condition: service_healthy
-
-  # abaper-mcp: run natively (binary at ~/src/abaper-mcp/abaper-mcp)
-  # source .env.dev && ABAPER_MODE=sse ABAPER_HTTP_PORT=8015 ~/src/abaper-mcp/abaper-mcp
