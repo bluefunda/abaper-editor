@@ -3,7 +3,7 @@
   "timeout": "60s",
   "cache_ttl": "0s",
   "adt_backend_host": "http://abaper-ts:8080",
-  "backend_host": "http://abaper:8080",
+  "backend_host": "http://abaper-ts:8080",
   "jwk_url": "https://jwks.bluefunda.com/combined-jwk",
   "cors": {
     "allow_origins": ["http://localhost:5173", "http://localhost:5174"],
@@ -16,7 +16,11 @@
       "Accept",
       "X-Requested-With",
       "X-Realm",
-      "X-GitHub-Token"
+      "X-GitHub-Token",
+      "X-SAP-Host",
+      "X-SAP-Client",
+      "X-SAP-User",
+      "X-SAP-Password"
     ],
     "expose_headers": [
       "Content-Length",

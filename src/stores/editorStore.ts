@@ -89,6 +89,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const filename = objectName.toLowerCase() + objectTypeToExtension(objectType);
     const uri = monaco.Uri.parse(`inmemory://model/${filename}`);
+    // Dispose any stale model with the same URI (e.g. after close+reopen)
+    const staleModel = monaco.editor.getModel(uri);
+    if (staleModel) staleModel.dispose();
     const model = monaco.editor.createModel(source, 'abap', uri);
 
     const id = `${objectType}:${objectName}`;

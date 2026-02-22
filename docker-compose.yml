@@ -1,8 +1,12 @@
-# Full stack — local development only
-# For production, use docker-compose.frontend.yml and docker-compose.apps.yml on their respective nodes
+# Full stack — all services in Docker
+# For development with HMR, use docker-compose.dev.yml + `LOCAL_GW=1 npm run dev` instead
+
 services:
   editor:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_GITHUB_CLIENT_ID: ${VITE_GITHUB_CLIENT_ID:-Iv23liG5YjZgDKlGmuxC}
     ports:
       - "3000:3000"
     environment:
@@ -14,17 +18,14 @@ services:
         condition: service_healthy
 
   abaper:
-    image: bluefunda/abaper:latest
-    command: abaper --server -p 8080
+    image: bluefunda/abaper:beta
+    command: ["./abaper", "server", "-p", "8080"]
     ports:
       - "8080:8080"
-    environment:
-      - SAP_HOST=${SAP_HOST:-}
-      - SAP_CLIENT=${SAP_CLIENT:-}
-      - SAP_USERNAME=${SAP_USERNAME:-}
-      - SAP_PASSWORD=${SAP_PASSWORD:-}
+      - "8089:8089"
+    env_file: .env.dev
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 3

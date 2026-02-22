@@ -17,6 +17,7 @@ import { GitHubExplorerPanel } from './components/panels/GitHubExplorerPanel';
 import { OpenObjectDialog } from './components/dialogs/OpenObjectDialog';
 import { ConnectionDialog } from './components/dialogs/ConnectionDialog';
 import { NewObjectDialog } from './components/dialogs/NewObjectDialog';
+import { AddSystemDialog } from './components/dialogs/AddSystemDialog';
 import { useSettingsStore } from './stores/settingsStore';
 import { useEditorStore } from './stores/editorStore';
 import { useConnectionStore } from './stores/connectionStore';
@@ -37,6 +38,7 @@ export default function App() {
   const [openObjectDialogOpen, setOpenObjectDialogOpen] = useState(false);
   const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
   const [newObjectDialogOpen, setNewObjectDialogOpen] = useState(false);
+  const [addSystemDialogOpen, setAddSystemDialogOpen] = useState(false);
   const [cursorLine, setCursorLine] = useState(1);
   const [cursorColumn, setCursorColumn] = useState(1);
 
@@ -72,7 +74,7 @@ export default function App() {
 
       if (activateOnSave) {
         appendOutput(`Activating ${tab.objectName}...`);
-        const result = await activateObject(tab.objectName, tab.objectType);
+        const result = await activateObject(tab.objectName, tab.objectType, source);
         appendOutput(
           result.success
             ? `Activated ${tab.objectName}`
@@ -88,10 +90,13 @@ export default function App() {
     const tab = useEditorStore.getState().getActiveTab();
     if (!tab) return;
     const appendOutput = useEditorStore.getState().appendOutput;
+    const markDirty = useEditorStore.getState().markDirty;
+    const source = tab.model.getValue();
 
     try {
       appendOutput(`Activating ${tab.objectName}...`);
-      const result = await activateObject(tab.objectName, tab.objectType);
+      const result = await activateObject(tab.objectName, tab.objectType, source);
+      markDirty(tab.id, false);
       appendOutput(
         result.success
           ? `Activated ${tab.objectName}`
@@ -257,7 +262,7 @@ export default function App() {
   const sidebarContent = (() => {
     switch (sidebarPanel) {
       case 'explorer':
-        return <ExplorerPanel onOpenObject={handleOpenObject} />;
+        return <ExplorerPanel onOpenObject={handleOpenObject} onAddSystem={() => setAddSystemDialogOpen(true)} />;
       case 'search':
         return <SearchPanel onOpenObject={handleOpenObject} />;
       case 'git':
@@ -321,6 +326,10 @@ export default function App() {
       <NewObjectDialog
         open={newObjectDialogOpen}
         onClose={() => setNewObjectDialogOpen(false)}
+      />
+      <AddSystemDialog
+        open={addSystemDialogOpen}
+        onClose={() => setAddSystemDialogOpen(false)}
       />
     </div>
   );

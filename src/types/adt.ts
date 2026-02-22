@@ -39,6 +39,19 @@ export interface ActivationResult {
   messages?: { severity: string; text: string; line?: number }[];
 }
 
+export interface PackageNode {
+  name: string;
+  type: string;
+  description: string;
+  expandable: boolean;
+  uri: string;
+}
+
+export interface PackageContentsResult {
+  nodes: PackageNode[];
+  objectTypes: { type: string; label: string }[];
+}
+
 export interface CompletionProposal {
   identifier: string;
   description: string;

@@ -1,5 +1,6 @@
 import { useConnectionStore } from '../../stores/connectionStore';
 import { useEditorStore } from '../../stores/editorStore';
+import { useSystemStore } from '../../stores/systemStore';
 import { ConnectionStatus } from '../../types/lsp';
 import { getUsername, getRealm, logout } from '../../services/auth';
 
@@ -14,6 +15,10 @@ export function StatusBar({ cursorLine, cursorColumn }: StatusBarProps) {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const tabs = useEditorStore((s) => s.tabs);
   const diagnosticsMap = useEditorStore((s) => s.diagnosticsMap);
+  const activeSystem = useSystemStore((s) => {
+    const sys = s.systems.find((sys) => sys.id === s.activeSystemId);
+    return sys;
+  });
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const diagnostics = activeTabId ? diagnosticsMap[activeTabId] ?? [] : [];
@@ -34,13 +39,25 @@ export function StatusBar({ cursorLine, cursorColumn }: StatusBarProps) {
     [ConnectionStatus.Connecting]: 'Connecting...',
   };
 
+  const systemStatusColor = activeSystem?.status === 'connected'
+    ? 'bg-success'
+    : activeSystem?.status === 'checking'
+      ? 'bg-info'
+      : 'bg-warning';
+
   return (
     <div className="flex items-center h-6 bg-statusbar-bg text-statusbar-fg text-[11px] px-3 gap-4 shrink-0 select-none">
       {/* Connection status */}
       <div className="flex items-center gap-1.5">
-        <div className={`w-2 h-2 rounded-full ${statusColors[status]}`} />
-        <span>{statusLabels[status]}</span>
-        {sapSystem && <span>({sapSystem})</span>}
+        <div className={`w-2 h-2 rounded-full ${activeSystem ? systemStatusColor : statusColors[status]}`} />
+        {activeSystem ? (
+          <span>{activeSystem.name} ({activeSystem.status})</span>
+        ) : (
+          <>
+            <span>{statusLabels[status]}</span>
+            {sapSystem && <span>({sapSystem})</span>}
+          </>
+        )}
       </div>
 
       {/* Active object */}

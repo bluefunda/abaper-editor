@@ -1,27 +1,7 @@
 import { useCallback } from 'react';
-import { abaperMCP, extractText } from '../services/mcp';
+import { abaperMCP, extractText, extractJSON } from '../services/mcp';
 import { useAIStore } from '../stores/aiStore';
 import type { ReviewFinding, S4RemediationResult, S4RemediationIssue } from '../types/mcp';
-
-function parseReviewFindings(text: string): ReviewFinding[] {
-  const findings: ReviewFinding[] = [];
-  // Parse structured JSON from tool output, fallback to raw text
-  try {
-    const parsed = JSON.parse(text);
-    if (Array.isArray(parsed)) {
-      return parsed.map((f: Record<string, unknown>) => ({
-        severity: (f.severity as ReviewFinding['severity']) || 'info',
-        message: String(f.message || ''),
-        line: Number(f.line) || 0,
-        suggestion: f.suggestion ? String(f.suggestion) : undefined,
-      }));
-    }
-  } catch {
-    // Treat as plain text — single finding
-    findings.push({ severity: 'info', message: text, line: 0 });
-  }
-  return findings;
-}
 
 function parseS4Result(text: string, objectName: string, objectType: string): S4RemediationResult {
   try {
@@ -50,6 +30,10 @@ function parseS4Result(text: string, objectName: string, objectType: string): S4
   }
 }
 
+function isCancelled(): boolean {
+  return !useAIStore.getState().isAnalyzing;
+}
+
 export function useAIAssistant() {
   const addMessage = useAIStore((s) => s.addMessage);
   const setAnalyzing = useAIStore((s) => s.setAnalyzing);
@@ -61,36 +45,38 @@ export function useAIAssistant() {
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Review ${objectType} ${objectName}` });
       try {
-        const result = await abaperMCP.callTool('get-object', {
+        const result = await abaperMCP.callTool('analyze-s4-remediation', {
           object_type: objectType,
           object_name: objectName,
         });
-        const source = extractText(result);
-        const reviewResult = await abaperMCP.callTool('syntax-check', {
-          object_type: objectType,
-          object_name: objectName,
-          source,
-        });
-        const text = extractText(reviewResult);
-        const findings = parseReviewFindings(text);
-        setReviewResult(findings);
+        const json = extractJSON<Record<string, unknown>>(result);
+        const markdown = extractText(result);
+        if (json) {
+          const s4Result = parseS4Result(JSON.stringify(json), objectName, objectType);
+          const findings: ReviewFinding[] = s4Result.issues.map((issue) => ({
+            severity: issue.severity === 'high' ? 'error' : issue.severity === 'medium' ? 'warning' : 'info',
+            message: `${issue.title}: ${issue.description}`,
+            line: issue.line,
+            suggestion: issue.after || undefined,
+          }));
+          setReviewResult(findings);
+        }
         addMessage({
           role: 'assistant',
-          content: findings.length
-            ? `Found ${findings.length} issue(s) in ${objectName}`
-            : `No issues found in ${objectName}`,
+          content: markdown || 'No issues found.',
           toolCalls: [
-            { name: 'get-object', args: { object_type: objectType, object_name: objectName } },
-            { name: 'syntax-check', args: { object_type: objectType, object_name: objectName } },
+            { name: 'analyze-s4-remediation', args: { object_type: objectType, object_name: objectName } },
           ],
         });
       } catch (err) {
-        addMessage({
-          role: 'assistant',
-          content: `Review failed: ${err instanceof Error ? err.message : String(err)}`,
-        });
+        if (!isCancelled()) {
+          addMessage({
+            role: 'assistant',
+            content: `Review failed: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
       } finally {
-        setAnalyzing(false);
+        if (!isCancelled()) setAnalyzing(false);
       }
     },
     [addMessage, setAnalyzing, setReviewResult],
@@ -105,25 +91,28 @@ export function useAIAssistant() {
           object_type: objectType,
           object_name: objectName,
         });
-        const text = extractText(result);
-        const s4Result = parseS4Result(text, objectName, objectType);
-        setS4Result(s4Result);
+        const json = extractJSON<Record<string, unknown>>(result);
+        const markdown = extractText(result);
+        if (json) {
+          const s4Result = parseS4Result(JSON.stringify(json), objectName, objectType);
+          setS4Result(s4Result);
+        }
         addMessage({
           role: 'assistant',
-          content: s4Result.totalIssues
-            ? `Found ${s4Result.totalIssues} S/4HANA remediation issue(s) in ${objectName}`
-            : `No S/4HANA remediation issues in ${objectName}`,
+          content: markdown || 'No S/4HANA remediation issues found.',
           toolCalls: [
             { name: 'analyze-s4-remediation', args: { object_type: objectType, object_name: objectName } },
           ],
         });
       } catch (err) {
-        addMessage({
-          role: 'assistant',
-          content: `S/4 analysis failed: ${err instanceof Error ? err.message : String(err)}`,
-        });
+        if (!isCancelled()) {
+          addMessage({
+            role: 'assistant',
+            content: `S/4 analysis failed: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
       } finally {
-        setAnalyzing(false);
+        if (!isCancelled()) setAnalyzing(false);
       }
     },
     [addMessage, setAnalyzing, setS4Result],
@@ -134,16 +123,26 @@ export function useAIAssistant() {
       setAnalyzing(true);
       addMessage({ role: 'user', content: 'Explain this ABAP code' });
       try {
-        const result = await abaperMCP.callTool('get-documentation', { source });
-        const text = extractText(result);
-        addMessage({ role: 'assistant', content: text });
+        // No server-side explain tool — display source summary locally
+        const lines = source.split('\n');
+        const summary = [
+          `**Code Summary** (${lines.length} lines)`,
+          '',
+          lines.length > 0 ? `First line: \`${lines[0]!.trim()}\`` : '',
+          `Contains ${lines.filter((l) => l.trim().startsWith('*') || l.trim().startsWith('"')).length} comment line(s)`,
+          `Contains ${lines.filter((l) => /\bMETHOD\b/i.test(l)).length} method definition(s)`,
+          `Contains ${lines.filter((l) => /\bSELECT\b/i.test(l)).length} SELECT statement(s)`,
+        ].filter(Boolean).join('\n');
+        addMessage({ role: 'assistant', content: summary });
       } catch (err) {
-        addMessage({
-          role: 'assistant',
-          content: `Explain failed: ${err instanceof Error ? err.message : String(err)}`,
-        });
+        if (!isCancelled()) {
+          addMessage({
+            role: 'assistant',
+            content: `Explain failed: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
       } finally {
-        setAnalyzing(false);
+        if (!isCancelled()) setAnalyzing(false);
       }
     },
     [addMessage, setAnalyzing],
@@ -158,21 +157,42 @@ export function useAIAssistant() {
           object_type: objectType,
           object_name: objectName,
         });
-        const text = extractText(result);
+        const json = extractJSON<Record<string, unknown>>(result);
+        let content: string;
+        if (json) {
+          const passed = Number(json.passed || 0);
+          const failed = Number(json.failed || 0);
+          const total = Number(json.total_tests || 0);
+          const allPassed = json.all_passed === true;
+          if (json.details && String(json.details).includes('failed:')) {
+            // Backend error
+            content = `**Unit tests for ${objectName}**: Error\n\n${String(json.details).split(':').slice(0, 2).join(':')}`;
+          } else if (total === 0) {
+            content = `**${objectName}**: No unit tests found.`;
+          } else if (allPassed) {
+            content = `**${objectName}**: All ${total} test(s) passed.`;
+          } else {
+            content = `**${objectName}**: ${passed}/${total} passed, ${failed} failed.`;
+          }
+        } else {
+          content = extractText(result) || 'Unit tests completed.';
+        }
         addMessage({
           role: 'assistant',
-          content: text || 'Unit tests completed.',
+          content,
           toolCalls: [
             { name: 'run-unit-tests', args: { object_type: objectType, object_name: objectName } },
           ],
         });
       } catch (err) {
-        addMessage({
-          role: 'assistant',
-          content: `Tests failed: ${err instanceof Error ? err.message : String(err)}`,
-        });
+        if (!isCancelled()) {
+          addMessage({
+            role: 'assistant',
+            content: `Tests failed: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
       } finally {
-        setAnalyzing(false);
+        if (!isCancelled()) setAnalyzing(false);
       }
     },
     [addMessage, setAnalyzing],
@@ -183,32 +203,27 @@ export function useAIAssistant() {
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Optimize ${objectType} ${objectName}` });
       try {
-        const result = await abaperMCP.callTool('get-object', {
+        const result = await abaperMCP.callTool('analyze-s4-remediation', {
           object_type: objectType,
           object_name: objectName,
         });
-        const source = extractText(result);
-        // Use where-used as a proxy for optimization analysis
-        const whereUsed = await abaperMCP.callTool('where-used', {
-          object_type: objectType,
-          object_name: objectName,
-        });
-        const usages = extractText(whereUsed);
+        const markdown = extractText(result);
         addMessage({
           role: 'assistant',
-          content: `**Optimization analysis for ${objectName}**\n\nSource length: ${source.length} chars\n\n**Usage references:**\n${usages || 'No references found.'}`,
+          content: markdown || 'No optimization suggestions found.',
           toolCalls: [
-            { name: 'get-object', args: { object_type: objectType, object_name: objectName } },
-            { name: 'where-used', args: { object_type: objectType, object_name: objectName } },
+            { name: 'analyze-s4-remediation', args: { object_type: objectType, object_name: objectName } },
           ],
         });
       } catch (err) {
-        addMessage({
-          role: 'assistant',
-          content: `Optimization analysis failed: ${err instanceof Error ? err.message : String(err)}`,
-        });
+        if (!isCancelled()) {
+          addMessage({
+            role: 'assistant',
+            content: `Optimization analysis failed: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
       } finally {
-        setAnalyzing(false);
+        if (!isCancelled()) setAnalyzing(false);
       }
     },
     [addMessage, setAnalyzing],

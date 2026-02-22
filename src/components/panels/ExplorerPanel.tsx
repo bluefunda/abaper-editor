@@ -1,37 +1,180 @@
-import { useState, useCallback } from 'react';
-import { Search, FileCode, ChevronRight, ChevronDown, Package, FolderOpen } from 'lucide-react';
-import { searchObjects, listPackages } from '../../services/api';
+import { useState, useCallback, useEffect } from 'react';
+import {
+  Search, FileCode, ChevronRight, ChevronDown, FolderOpen, Plus, X, Pin,
+  Box, Circle, Layers, Table, Server,
+} from 'lucide-react';
+import { searchObjects, getPackageContents } from '../../services/api';
+import { useSystemStore } from '../../stores/systemStore';
+import { useFavoritePackagesStore, type PackageTreeNode } from '../../stores/favoritePackagesStore';
+import { PackageSearchPopover } from './PackageSearchPopover';
 import { Icon } from '../common/Icon';
 import { Spinner } from '../common/Spinner';
 import type { ADTObject } from '../../types/adt';
 
 interface ExplorerPanelProps {
   onOpenObject: (name: string, type: string) => void;
+  onAddSystem: () => void;
 }
 
-interface PackageNode {
-  name: string;
-  objects: ADTObject[];
-  loading: boolean;
-  expanded: boolean;
+const TYPE_ICONS: Record<string, { icon: typeof FileCode; color: string }> = {
+  'PROG/P': { icon: FileCode, color: 'text-blue-400' },
+  'PROG': { icon: FileCode, color: 'text-blue-400' },
+  'CLAS/OC': { icon: Box, color: 'text-purple-400' },
+  'CLAS': { icon: Box, color: 'text-purple-400' },
+  'INTF/OI': { icon: Circle, color: 'text-cyan-400' },
+  'INTF': { icon: Circle, color: 'text-cyan-400' },
+  'FUGR/F': { icon: Layers, color: 'text-orange-400' },
+  'FUGR': { icon: Layers, color: 'text-orange-400' },
+  'TABL/DT': { icon: Table, color: 'text-green-400' },
+  'TABL': { icon: Table, color: 'text-green-400' },
+  'DEVC/K': { icon: FolderOpen, color: 'text-yellow-400' },
+  'DEVC': { icon: FolderOpen, color: 'text-yellow-400' },
+};
+
+function getTypeIcon(type: string) {
+  return TYPE_ICONS[type] ?? TYPE_ICONS[type.split('/')[0] ?? ''] ?? { icon: FileCode, color: 'text-sidebar-fg/60' };
 }
 
-export function ExplorerPanel({ onOpenObject }: ExplorerPanelProps) {
+function PackageTreeNodeItem({
+  node,
+  path,
+  depth,
+  onOpenObject,
+}: {
+  node: PackageTreeNode;
+  path: string;
+  depth: number;
+  onOpenObject: (name: string, type: string) => void;
+}) {
+  const expandedPaths = useFavoritePackagesStore((s) => s.expandedPaths);
+  const loadingPaths = useFavoritePackagesStore((s) => s.loadingPaths);
+  const toggleExpanded = useFavoritePackagesStore((s) => s.toggleExpanded);
+  const setPackageChildren = useFavoritePackagesStore((s) => s.setPackageChildren);
+  const setLoading = useFavoritePackagesStore((s) => s.setLoading);
+
+  const isExpanded = expandedPaths.includes(path);
+  const isLoading = loadingPaths.includes(path);
+  const isExpandable = node.expandable;
+  const { icon, color } = getTypeIcon(node.type);
+
+  const handleClick = useCallback(async () => {
+    if (!isExpandable) return;
+    toggleExpanded(path);
+
+    if (!isExpanded && node.children === undefined) {
+      setLoading(path, true);
+      try {
+        const result = await getPackageContents(node.name);
+        const children: PackageTreeNode[] = result.nodes.map((n) => ({
+          name: n.name,
+          type: n.type,
+          description: n.description,
+          expandable: n.expandable,
+          children: undefined,
+        }));
+        setPackageChildren(path, children);
+      } catch {
+        setLoading(path, false);
+      }
+    }
+  }, [isExpandable, isExpanded, node, path, toggleExpanded, setPackageChildren, setLoading]);
+
+  const handleDoubleClick = useCallback(() => {
+    if (!isExpandable) {
+      const baseType = node.type.split('/')[0] ?? node.type;
+      onOpenObject(node.name, baseType);
+    }
+  }, [isExpandable, node, onOpenObject]);
+
+  return (
+    <div>
+      <button
+        className="w-full flex items-center gap-1.5 py-1 text-xs hover:bg-white/5 text-left group"
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
+        {isExpandable ? (
+          <Icon
+            icon={isExpanded ? ChevronDown : ChevronRight}
+            size={12}
+            className="text-sidebar-fg/40 shrink-0"
+          />
+        ) : (
+          <span className="w-3 shrink-0" />
+        )}
+        <Icon icon={icon} size={14} className={`${color} shrink-0`} />
+        <span className="truncate flex-1">{node.name}</span>
+        {node.description && (
+          <span className="text-sidebar-fg/30 text-[10px] truncate max-w-[80px] mr-1">{node.description}</span>
+        )}
+        <span className="text-sidebar-fg/20 text-[10px] uppercase shrink-0 mr-1">
+          {node.type.split('/')[0]}
+        </span>
+      </button>
+
+      {isExpandable && isExpanded && (
+        <div>
+          {isLoading ? (
+            <div className="flex justify-center py-1">
+              <Spinner />
+            </div>
+          ) : node.children === undefined ? null : node.children.length === 0 ? (
+            <div
+              className="text-sidebar-fg/30 text-xs py-0.5"
+              style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}
+            >
+              Empty
+            </div>
+          ) : (
+            node.children.map((child) => (
+              <PackageTreeNodeItem
+                key={`${path}/${child.name}`}
+                node={child}
+                path={`${path}/${child.name}`}
+                depth={depth + 1}
+                onOpenObject={onOpenObject}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ExplorerPanel({ onOpenObject, onAddSystem }: ExplorerPanelProps) {
+  const systems = useSystemStore((s) => s.systems);
+  const activeSystemId = useSystemStore((s) => s.activeSystemId);
+  const setActiveSystem = useSystemStore((s) => s.setActiveSystem);
+
+  const favorites = useFavoritePackagesStore((s) => {
+    return activeSystemId ? s.favoritesBySystem[activeSystemId] ?? [] : [];
+  });
+  const trees = useFavoritePackagesStore((s) => s.trees);
+  const expandedPaths = useFavoritePackagesStore((s) => s.expandedPaths);
+  const loadingPaths = useFavoritePackagesStore((s) => s.loadingPaths);
+  const addFavorite = useFavoritePackagesStore((s) => s.addFavorite);
+  const removeFavorite = useFavoritePackagesStore((s) => s.removeFavorite);
+  const toggleExpanded = useFavoritePackagesStore((s) => s.toggleExpanded);
+  const setPackageChildren = useFavoritePackagesStore((s) => s.setPackageChildren);
+  const setLoading = useFavoritePackagesStore((s) => s.setLoading);
+  const clearTrees = useFavoritePackagesStore((s) => s.clearTrees);
+
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ADTObject[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setSearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pinPopoverOpen, setPinPopoverOpen] = useState(false);
 
-  // Package tree state
-  const [packagesOpen, setPackagesOpen] = useState(false);
-  const [packageFilter, setPackageFilter] = useState('');
-  const [packages, setPackages] = useState<PackageNode[]>([]);
-  const [packagesLoading, setPackagesLoading] = useState(false);
-  const [packagesError, setPackagesError] = useState<string | null>(null);
+  // Clear trees when active system changes
+  useEffect(() => {
+    clearTrees();
+  }, [activeSystemId, clearTrees]);
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
-    setLoading(true);
+    setSearchLoading(true);
     setError(null);
     try {
       const objects = await searchObjects(query);
@@ -39,58 +182,75 @@ export function ExplorerPanel({ onOpenObject }: ExplorerPanelProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
-      setLoading(false);
+      setSearchLoading(false);
     }
   }, [query]);
 
-  const handlePackageSearch = useCallback(async () => {
-    if (!packageFilter.trim()) return;
-    setPackagesLoading(true);
-    setPackagesError(null);
-    try {
-      const pkgs = await listPackages(packageFilter);
-      setPackages(pkgs.map((p) => ({ name: p.name, objects: [], loading: false, expanded: false })));
-    } catch (err) {
-      setPackagesError(err instanceof Error ? err.message : 'Failed to load packages');
-    } finally {
-      setPackagesLoading(false);
+  const handleExpandFavorite = useCallback(async (pkgName: string) => {
+    const path = pkgName;
+    toggleExpanded(path);
+
+    const isCurrentlyExpanded = expandedPaths.includes(path);
+    if (!isCurrentlyExpanded && !trees[pkgName]) {
+      setLoading(path, true);
+      try {
+        const result = await getPackageContents(pkgName);
+        const children: PackageTreeNode[] = result.nodes.map((n) => ({
+          name: n.name,
+          type: n.type,
+          description: n.description,
+          expandable: n.expandable,
+          children: undefined,
+        }));
+        setPackageChildren(path, children);
+      } catch {
+        setLoading(path, false);
+      }
     }
-  }, [packageFilter]);
+  }, [toggleExpanded, expandedPaths, trees, setPackageChildren, setLoading]);
 
-  const handleExpandPackage = useCallback(async (pkgName: string) => {
-    setPackages((prev) =>
-      prev.map((p) => {
-        if (p.name !== pkgName) return p;
-        if (p.expanded) return { ...p, expanded: false };
-        // If already loaded objects, just toggle
-        if (p.objects.length > 0) return { ...p, expanded: true };
-        return { ...p, expanded: true, loading: true };
-      }),
-    );
-
-    // Check if we need to load objects
-    const pkg = packages.find((p) => p.name === pkgName);
-    if (pkg && pkg.objects.length > 0) return;
-
-    try {
-      const objects = await searchObjects(`*`);
-      const filtered = objects.filter(
-        (obj) => obj.package?.toUpperCase() === pkgName.toUpperCase(),
-      );
-      setPackages((prev) =>
-        prev.map((p) =>
-          p.name === pkgName ? { ...p, objects: filtered, loading: false } : p,
-        ),
-      );
-    } catch {
-      setPackages((prev) =>
-        prev.map((p) => (p.name === pkgName ? { ...p, loading: false } : p)),
-      );
+  const handlePinPackage = useCallback((packageName: string) => {
+    if (activeSystemId) {
+      addFavorite(activeSystemId, packageName);
     }
-  }, [packages]);
+  }, [activeSystemId, addFavorite]);
+
+  const handleUnpinPackage = useCallback((packageName: string) => {
+    if (activeSystemId) {
+      removeFavorite(activeSystemId, packageName);
+    }
+  }, [activeSystemId, removeFavorite]);
 
   return (
     <div className="flex flex-col h-full">
+      {/* System selector */}
+      <div className="px-2 pb-2">
+        <div className="flex items-center gap-1">
+          <div className="flex-1 flex items-center gap-1.5 bg-editor-bg rounded border border-panel-border">
+            <Icon icon={Server} size={13} className="text-sidebar-fg/40 ml-2 shrink-0" />
+            <select
+              className="flex-1 bg-transparent text-xs py-1.5 text-editor-fg outline-none appearance-none cursor-pointer"
+              value={activeSystemId ?? ''}
+              onChange={(e) => setActiveSystem(e.target.value || null)}
+            >
+              {systems.length === 0 && <option value="">No systems configured</option>}
+              {systems.map((sys) => (
+                <option key={sys.id} value={sys.id}>
+                  {sys.name} {sys.status === 'connected' ? '' : `(${sys.status})`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="p-1.5 text-sidebar-fg/60 hover:text-sidebar-fg hover:bg-white/5 rounded"
+            onClick={onAddSystem}
+            title="Add SAP System"
+          >
+            <Icon icon={Plus} size={14} />
+          </button>
+        </div>
+      </div>
+
       {/* Object search */}
       <div className="px-2 pb-2">
         <div className="flex items-center gap-1 bg-editor-bg rounded border border-panel-border">
@@ -111,123 +271,130 @@ export function ExplorerPanel({ onOpenObject }: ExplorerPanelProps) {
         </div>
       </div>
 
-      {loading && (
-        <div className="flex justify-center py-4">
-          <Spinner />
-        </div>
-      )}
-
-      {error && <div className="px-3 py-2 text-error text-xs">{error}</div>}
-
       <div className="flex-1 overflow-auto">
-        {/* Search results */}
-        {results.map((obj) => (
-          <button
-            key={`${obj.type}:${obj.name}`}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-white/5 text-left"
-            onDoubleClick={() => onOpenObject(obj.name, obj.type)}
-          >
-            <Icon icon={ChevronRight} size={12} className="text-sidebar-fg/30" />
-            <Icon icon={FileCode} size={14} className="text-accent" />
-            <div className="flex-1 min-w-0">
-              <div className="truncate">{obj.name}</div>
-              <div className="text-sidebar-fg/40 truncate">{obj.description}</div>
+        {/* Favorite packages section */}
+        <div className="border-b border-panel-border">
+          <div className="flex items-center px-3 py-1.5">
+            <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-fg/60">
+              Favorite Packages
+            </span>
+            <button
+              className="p-0.5 text-sidebar-fg/40 hover:text-sidebar-fg rounded"
+              onClick={() => setPinPopoverOpen(true)}
+              title="Pin a package"
+            >
+              <Icon icon={Pin} size={13} />
+            </button>
+          </div>
+
+          {favorites.length === 0 && (
+            <div className="px-3 py-2 text-sidebar-fg/30 text-xs">
+              No pinned packages. Click + to add.
             </div>
-            <span className="text-sidebar-fg/30 text-[10px] uppercase">{obj.type}</span>
-          </button>
-        ))}
+          )}
+
+          {favorites.map((pkgName) => {
+            const isExpanded = expandedPaths.includes(pkgName);
+            const isLoading = loadingPaths.includes(pkgName);
+            const children = trees[pkgName];
+
+            return (
+              <div key={pkgName}>
+                <div className="flex items-center group">
+                  <button
+                    className="flex-1 flex items-center gap-1.5 py-1 text-xs hover:bg-white/5 text-left pl-2"
+                    onClick={() => handleExpandFavorite(pkgName)}
+                  >
+                    <Icon
+                      icon={isExpanded ? ChevronDown : ChevronRight}
+                      size={12}
+                      className="text-sidebar-fg/40 shrink-0"
+                    />
+                    <Icon icon={FolderOpen} size={14} className="text-yellow-400/70 shrink-0" />
+                    <span className="truncate">{pkgName}</span>
+                  </button>
+                  <button
+                    className="p-1 mr-1 text-sidebar-fg/20 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => handleUnpinPackage(pkgName)}
+                    title="Unpin package"
+                  >
+                    <Icon icon={X} size={12} />
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div>
+                    {isLoading ? (
+                      <div className="flex justify-center py-1">
+                        <Spinner />
+                      </div>
+                    ) : children === undefined ? null : children.length === 0 ? (
+                      <div className="text-sidebar-fg/30 text-xs py-0.5 pl-8">Empty</div>
+                    ) : (
+                      children.map((child) => (
+                        <PackageTreeNodeItem
+                          key={`${pkgName}/${child.name}`}
+                          node={child}
+                          path={`${pkgName}/${child.name}`}
+                          depth={1}
+                          onOpenObject={onOpenObject}
+                        />
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Search results */}
+        {loading && (
+          <div className="flex justify-center py-4">
+            <Spinner />
+          </div>
+        )}
+
+        {error && <div className="px-3 py-2 text-error text-xs">{error}</div>}
+
+        {results.length > 0 && (
+          <div className="border-b border-panel-border">
+            <div className="px-3 py-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-fg/60">
+                Search Results
+              </span>
+            </div>
+            {results.map((obj) => {
+              const { icon, color } = getTypeIcon(obj.type);
+              return (
+                <button
+                  key={`${obj.type}:${obj.name}`}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-white/5 text-left"
+                  onDoubleClick={() => onOpenObject(obj.name, obj.type)}
+                >
+                  <Icon icon={icon} size={14} className={color} />
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate">{obj.name}</div>
+                    <div className="text-sidebar-fg/40 truncate">{obj.description}</div>
+                  </div>
+                  <span className="text-sidebar-fg/30 text-[10px] uppercase">{obj.type}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {!loading && !error && results.length === 0 && query && (
           <div className="px-3 py-4 text-center text-sidebar-fg/30 text-xs">No results</div>
         )}
-
-        {/* Packages section */}
-        <div className="border-t border-panel-border mt-2">
-          <button
-            className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-fg/60 hover:text-sidebar-fg"
-            onClick={() => setPackagesOpen(!packagesOpen)}
-          >
-            <Icon icon={packagesOpen ? ChevronDown : ChevronRight} size={12} />
-            <Icon icon={Package} size={14} />
-            Packages
-          </button>
-
-          {packagesOpen && (
-            <div>
-              <div className="px-2 pb-2">
-                <div className="flex items-center gap-1 bg-editor-bg rounded border border-panel-border">
-                  <input
-                    type="text"
-                    className="flex-1 bg-transparent text-xs px-2 py-1.5 outline-none text-editor-fg placeholder:text-sidebar-fg/30"
-                    placeholder="Filter packages..."
-                    value={packageFilter}
-                    onChange={(e) => setPackageFilter(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handlePackageSearch()}
-                  />
-                  <button
-                    className="px-1.5 text-sidebar-fg/60 hover:text-sidebar-fg"
-                    onClick={handlePackageSearch}
-                  >
-                    <Icon icon={Search} size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {packagesLoading && (
-                <div className="flex justify-center py-2">
-                  <Spinner />
-                </div>
-              )}
-
-              {packagesError && (
-                <div className="px-3 py-1 text-error text-xs">{packagesError}</div>
-              )}
-
-              {packages.map((pkg) => (
-                <div key={pkg.name}>
-                  <button
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-white/5 text-left"
-                    onClick={() => handleExpandPackage(pkg.name)}
-                  >
-                    <Icon
-                      icon={pkg.expanded ? ChevronDown : ChevronRight}
-                      size={12}
-                      className="text-sidebar-fg/40"
-                    />
-                    <Icon icon={FolderOpen} size={14} className="text-yellow-400/70" />
-                    <span className="truncate">{pkg.name}</span>
-                  </button>
-
-                  {pkg.expanded && (
-                    <div className="ml-4">
-                      {pkg.loading && (
-                        <div className="flex justify-center py-1">
-                          <Spinner />
-                        </div>
-                      )}
-                      {!pkg.loading && pkg.objects.length === 0 && (
-                        <div className="px-3 py-1 text-sidebar-fg/30 text-xs">No objects</div>
-                      )}
-                      {pkg.objects.map((obj) => (
-                        <button
-                          key={`${obj.type}:${obj.name}`}
-                          className="w-full flex items-center gap-2 px-3 py-1 text-xs hover:bg-white/5 text-left"
-                          onDoubleClick={() => onOpenObject(obj.name, obj.type)}
-                        >
-                          <Icon icon={FileCode} size={13} className="text-accent" />
-                          <div className="flex-1 min-w-0">
-                            <div className="truncate">{obj.name}</div>
-                          </div>
-                          <span className="text-sidebar-fg/30 text-[10px] uppercase">{obj.type}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* Package search popover */}
+      <PackageSearchPopover
+        open={pinPopoverOpen}
+        onClose={() => setPinPopoverOpen(false)}
+        onSelect={handlePinPackage}
+      />
     </div>
   );
 }

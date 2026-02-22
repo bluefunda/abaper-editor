@@ -1,3 +1,6 @@
+import { Buffer } from 'buffer';
+(globalThis as unknown as Record<string, unknown>).Buffer = Buffer;
+
 import { Transpiler } from '@abaplint/transpiler';
 
 interface TranspileRequest {

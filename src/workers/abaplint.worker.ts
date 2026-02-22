@@ -1,5 +1,9 @@
+import { Buffer } from 'buffer';
+(globalThis as unknown as Record<string, unknown>).Buffer = Buffer;
+
 import { Registry, MemoryFile, Config } from '@abaplint/core';
 import type { DiagnosticItem } from '../types/editor';
+import type { IConfig } from '@abaplint/core';
 
 interface LintRequest {
   type: 'lint';
@@ -14,14 +18,43 @@ interface LintResponse {
   diagnostics: DiagnosticItem[];
 }
 
-const defaultConfig = Config.getDefault();
+// Relaxed config: syntax/parser errors + important semantic checks only.
+// Disable all style, formatting, and naming rules to reduce noise.
+const lintConfig: IConfig = {
+  ...(Config.getDefault() as unknown as { config: IConfig }).config,
+  rules: {
+    // Parser & syntax (critical)
+    parser_error: true,
+    parser_missing_space: true,
+    parser_bad_exceptions: true,
+    // Semantic checks
+    begin_end_names: true,
+    method_implemented_twice: true,
+    unreachable_code: true,
+    empty_statement: true,
+    empty_structure: true,
+    obsolete_statement: true,
+    ambiguous_statement: true,
+    identical_conditions: true,
+    identical_contents: true,
+    // Useful warnings
+    sy_modification: true,
+    dangerous_statement: true,
+    try_without_catch: true,
+    mix_returning: true,
+    when_others_last: true,
+    // Everything else off
+  },
+};
+
+const editorConfig = new Config(JSON.stringify(lintConfig));
 
 self.onmessage = async (e: MessageEvent<LintRequest>) => {
   const { type, id, filename, source } = e.data;
   if (type !== 'lint') return;
 
   try {
-    const reg = new Registry(defaultConfig);
+    const reg = new Registry(editorConfig);
     reg.addFile(new MemoryFile(filename, source));
     await reg.parseAsync();
     const issues = reg.findIssues();

@@ -8,36 +8,22 @@
 services:
   # TypeScript backend — SAP ADT operations (via abap-adt-api)
   abaper-ts:
-    image: abaper-ts:beta
+    build:
+      context: ../../Downloads/src/abaper-ts
     ports:
       - "8085:8080"
     env_file: .env.dev
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 10s
 
-  # Go backend — GitHub proxy + misc non-ADT services
-  abaper:
-    image: bluefunda/abaper:beta
-    platform: linux/amd64
-    command: ["./abaper", "server", "-p", "8080"]
-    ports:
-      - "8080:8080"
-      - "8089:8089"
-    env_file: .env.dev
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-
   # MCP server — AI tool interface, calls abaper-ts for ADT
   abaper-mcp:
-    image: abaper-mcp:beta
+    build:
+      context: ../../Downloads/src/abaper-mcp
     ports:
       - "8015:8015"
     environment:
@@ -59,10 +45,11 @@ services:
   gateway:
     build:
       context: ../../src/abaper-gw
+      args:
+        ENV: compose
     ports:
       - "8083:8083"
     environment:
-      ENV: compose
       DOMAIN: localhost
       CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:5174"
     volumes:
@@ -70,5 +57,8 @@ services:
     depends_on:
       abaper-ts:
         condition: service_healthy
-      abaper:
-        condition: service_healthy
+
+networks:
+  default:
+    name: trm-network
+    external: true

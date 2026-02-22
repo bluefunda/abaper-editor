@@ -1,5 +1,6 @@
-import type { ADTSourceCode, ADTObject, SyntaxCheckResult, ActivationResult } from '../types/adt';
+import type { ADTSourceCode, ADTObject, SyntaxCheckResult, ActivationResult, PackageContentsResult } from '../types/adt';
 import { getToken, getRealm, refreshToken } from './auth';
+import { useSystemStore, type SAPSystem } from '../stores/systemStore';
 
 let BASE_URL = import.meta.env.VITE_API_BASE_URL as string || '';
 
@@ -17,11 +18,52 @@ interface APIResponse<T> {
   error?: string;
 }
 
+function getSAPHeaders(system?: SAPSystem): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (system) {
+    headers['X-SAP-Host'] = system.host;
+    headers['X-SAP-Client'] = system.client;
+    headers['X-SAP-User'] = system.username;
+    headers['X-SAP-Password'] = system.password;
+  }
+  return headers;
+}
+
 async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
   await refreshToken();
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const realm = getRealm();
+  if (realm) {
+    headers['X-Realm'] = realm;
+  }
+
+  // Inject active system SAP headers
+  const activeSystem = useSystemStore.getState().getActiveSystem();
+  Object.assign(headers, getSAPHeaders(activeSystem));
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers,
+    ...options,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function fetchJSONForSystem<T>(system: SAPSystem, path: string, options?: RequestInit): Promise<T> {
+  await refreshToken();
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...getSAPHeaders(system),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -46,12 +88,20 @@ export function healthCheck(): Promise<{ status: string }> {
   return fetchJSON('/health');
 }
 
+export async function testSystemConnection(): Promise<{ success: boolean; data: { status: string; authenticated: boolean } }> {
+  return fetchJSON('/api/v1/system/connect', { method: 'POST' });
+}
+
+export async function testSystemConnectionFor(system: SAPSystem): Promise<{ success: boolean; data: { status: string; authenticated: boolean } }> {
+  return fetchJSONForSystem(system, '/api/v1/system/connect', { method: 'POST' });
+}
+
 export async function getObject(
   type: string,
   name: string,
   functionGroup?: string,
 ): Promise<ADTSourceCode> {
-  // Strip ADT subtype (e.g. "CLAS/OC" → "CLAS")
+  // Strip ADT subtype (e.g. "CLAS/OC" -> "CLAS")
   const baseType = type.split('/')[0] ?? type;
   const body: Record<string, string> = { object_type: baseType, object_name: name };
   if (functionGroup) body.function_group = functionGroup;
@@ -83,6 +133,14 @@ export async function listPackages(pattern: string): Promise<ADTObject[]> {
   return res.data ?? [];
 }
 
+export async function getPackageContents(packageName: string): Promise<PackageContentsResult> {
+  const res = await fetchJSON<APIResponse<PackageContentsResult>>('/api/v1/packages/contents', {
+    method: 'POST',
+    body: JSON.stringify({ package_name: packageName }),
+  });
+  return res.data;
+}
+
 export async function saveObject(
   objectName: string,
   objectType: string,
@@ -103,13 +161,16 @@ export async function saveObject(
 export async function activateObject(
   objectName: string,
   objectType: string,
+  source?: string,
 ): Promise<ActivationResult> {
+  const body: Record<string, string> = {
+    object_name: objectName,
+    object_type: objectType,
+  };
+  if (source !== undefined) body.source = source;
   const res = await fetchJSON<APIResponse<ActivationResult>>('/api/v1/activate', {
     method: 'POST',
-    body: JSON.stringify({
-      object_name: objectName,
-      object_type: objectType,
-    }),
+    body: JSON.stringify(body),
   });
   return res.data;
 }

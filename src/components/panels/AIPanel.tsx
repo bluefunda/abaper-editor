@@ -6,12 +6,12 @@ import {
   TestTube,
   Zap,
   Trash2,
+  Square,
   AlertTriangle,
   AlertCircle,
   Info,
 } from 'lucide-react';
 import { useAIStore } from '../../stores/aiStore';
-import { Spinner } from '../common/Spinner';
 import { Icon } from '../common/Icon';
 import type { ReviewFinding, S4RemediationIssue } from '../../types/mcp';
 
@@ -127,6 +127,7 @@ export function AIPanel({
   const lastReviewResult = useAIStore((s) => s.lastReviewResult);
   const lastS4Result = useAIStore((s) => s.lastS4Result);
   const clearMessages = useAIStore((s) => s.clearMessages);
+  const cancelAnalysis = useAIStore((s) => s.cancelAnalysis);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll on new messages
@@ -160,7 +161,16 @@ export function AIPanel({
           </button>
         ))}
         <div className="flex-1" />
-        {isAnalyzing && <Spinner size={14} />}
+        {isAnalyzing && (
+          <button
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30"
+            onClick={cancelAnalysis}
+            title="Stop"
+          >
+            <Icon icon={Square} size={11} />
+            Stop
+          </button>
+        )}
         <button
           className="px-1.5 text-sidebar-fg/40 hover:text-sidebar-fg"
           onClick={clearMessages}

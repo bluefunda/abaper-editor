@@ -24,20 +24,19 @@ export interface MCPToolCallResult {
   isError?: boolean;
 }
 
-// abaper-mcp tool names (12 tools)
+// abaper-mcp tool names (11 tools)
 export type ABAPToolName =
   | 'get-object'
-  | 'save-object'
-  | 'activate-object'
-  | 'syntax-check'
   | 'search-objects'
-  | 'get-transport-requests'
-  | 'release-transport'
+  | 'list-packages'
+  | 'test-connection'
+  | 'create-program'
+  | 'create-class'
+  | 'update-program'
+  | 'update-class'
+  | 'activate-object'
   | 'run-unit-tests'
-  | 'get-object-metadata'
-  | 'analyze-s4-remediation'
-  | 'get-documentation'
-  | 'where-used';
+  | 'analyze-s4-remediation';
 
 // Key github-mcp tool names
 export type GitHubToolName =
