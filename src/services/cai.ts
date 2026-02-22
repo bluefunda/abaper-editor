@@ -40,7 +40,7 @@ export async function streamChat(
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (realm) headers['X-Realm'] = realm;
 
-  const response = await fetch(`/cai/chats/${req.chat_id}`, {
+  const response = await fetch(`/ai/chats/${req.chat_id}`, {
     method: 'POST',
     headers,
     body: JSON.stringify({

@@ -50,20 +50,20 @@ export default defineConfig({
         secure: !isLocal && !noAuth,
         rewrite: isLocal && !noAuth ? (p) => `/abaper${p}` : undefined,
       },
-      // CAI (Convo AI) streaming → always api.bluefunda.com/ai (LOCAL=1 overrides to local)
-      '/cai': {
-        target: isLocal ? 'http://localhost:8081' : 'https://api.bluefunda.com',
+      // AI (Convo AI) streaming → local ai-gw or production via abaper.bluefunda.com/ai
+      '/ai': {
+        target: isLocal ? 'http://localhost:8081' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
         secure: !isLocal,
         rewrite: isLocal
-          ? (p: string) => p.replace(/^\/cai/, '')
-          : (p: string) => p.replace(/^\/cai/, '/ai'),
+          ? (p: string) => p.replace(/^\/ai/, '')
+          : undefined,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
-            console.log(`[cai-proxy] ${req.method} ${req.url} → ${proxyReq.path}`);
+            console.log(`[ai-proxy] ${req.method} ${req.url} → ${proxyReq.path}`);
           });
           proxy.on('proxyRes', (proxyRes, req) => {
-            console.log(`[cai-proxy] ${req.url} ← ${proxyRes.statusCode}`);
+            console.log(`[ai-proxy] ${req.url} ← ${proxyRes.statusCode}`);
             if (proxyRes.headers['content-type']?.includes('text/event-stream') ||
                 proxyRes.headers['content-type']?.includes('application/x-ndjson')) {
               proxyRes.headers['cache-control'] = 'no-cache';
