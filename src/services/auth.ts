@@ -16,7 +16,15 @@ export function getRealmFromPath(): string | null {
 let keycloak: Keycloak | null = null;
 let initialized = false;
 
+const SKIP_AUTH = import.meta.env.VITE_SKIP_AUTH === 'true';
+
 export async function initAuth(): Promise<boolean> {
+  if (SKIP_AUTH) {
+    console.log('[auth] Skipping Keycloak (VITE_SKIP_AUTH=true)');
+    initialized = true;
+    return true;
+  }
+
   const realm = getRealmFromPath();
 
   if (!realm) {

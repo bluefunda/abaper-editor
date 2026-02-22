@@ -44,7 +44,7 @@ export function useAbaplint(editor: monaco.editor.IStandaloneCodeEditor | null) 
         monaco.editor.setModelMarkers(model, 'abaplint', markers);
 
         if (tabId) {
-          useEditorStore.getState().setDiagnostics(tabId, diagnostics);
+          useEditorStore.getState().setDiagnostics(tabId, 'abaplint', diagnostics);
         }
       });
     };

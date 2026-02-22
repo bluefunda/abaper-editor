@@ -1,10 +1,11 @@
-import { AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Info, Wand2 } from 'lucide-react';
 import { useEditorStore } from '../../stores/editorStore';
 import { Icon } from '../common/Icon';
 import type { DiagnosticItem } from '../../types/editor';
 
 interface ProblemsPanelProps {
   onNavigate: (line: number, column: number) => void;
+  onFixError?: (diagnostic: DiagnosticItem) => void;
 }
 
 function severityIcon(severity: DiagnosticItem['severity']) {
@@ -18,7 +19,7 @@ function severityIcon(severity: DiagnosticItem['severity']) {
   }
 }
 
-export function ProblemsPanel({ onNavigate }: ProblemsPanelProps) {
+export function ProblemsPanel({ onNavigate, onFixError }: ProblemsPanelProps) {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const diagnosticsMap = useEditorStore((s) => s.diagnosticsMap);
   const diagnostics = activeTabId ? diagnosticsMap[activeTabId] ?? [] : [];
@@ -46,6 +47,19 @@ export function ProblemsPanel({ onNavigate }: ProblemsPanelProps) {
             [{d.startLineNumber}:{d.startColumn}]
           </span>
           <span className="text-sidebar-fg/30 shrink-0">{d.source}</span>
+          {onFixError && d.severity === 'error' && (
+            <button
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-accent hover:bg-accent/20 shrink-0 ml-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFixError(d);
+              }}
+              title="Fix with AI"
+            >
+              <Icon icon={Wand2} size={12} />
+              Fix
+            </button>
+          )}
         </button>
       ))}
     </div>

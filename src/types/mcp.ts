@@ -24,7 +24,13 @@ export interface MCPToolCallResult {
   isError?: boolean;
 }
 
-// abaper-mcp tool names (11 tools)
+// MCP tool info returned by tools/list
+export interface MCPToolInfo {
+  name: string;
+  description: string;
+}
+
+// abaper-mcp tool names
 export type ABAPToolName =
   | 'get-object'
   | 'search-objects'
@@ -36,7 +42,11 @@ export type ABAPToolName =
   | 'update-class'
   | 'activate-object'
   | 'run-unit-tests'
-  | 'analyze-s4-remediation';
+  | 'analyze-s4-remediation'
+  | 'syntax-check'
+  | 'format-code'
+  | 'transport-info'
+  | 'create-transport';
 
 // Key github-mcp tool names
 export type GitHubToolName =
@@ -59,6 +69,7 @@ export interface AIMessage {
   content: string;
   timestamp: number;
   toolCalls?: { name: string; args: Record<string, unknown>; result?: string }[];
+  isStreaming?: boolean;
 }
 
 // S/4HANA remediation types

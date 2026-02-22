@@ -24,9 +24,11 @@ import { useConnectionStore } from './stores/connectionStore';
 import { useAIStore } from './stores/aiStore';
 import { useSAPConnection } from './hooks/useSAPConnection';
 import { useAIAssistant } from './hooks/useAIAssistant';
-import { saveObject, activateObject, syntaxCheck, getObject } from './services/api';
+import * as monaco from 'monaco-editor';
+import { saveObject, activateObject, syntaxCheck, getObject, formatCode } from './services/api';
 import { initMCP } from './services/mcp';
 import { normalizeObjectType } from './stores/editorStore';
+import type { DiagnosticItem } from './types/editor';
 
 export default function App() {
   const theme = useSettingsStore((s) => s.theme);
@@ -42,11 +44,12 @@ export default function App() {
   const [cursorLine, setCursorLine] = useState(1);
   const [cursorColumn, setCursorColumn] = useState(1);
 
-  const editorRef = useRef<{ revealLineInCenter: (line: number) => void; setPosition: (pos: { lineNumber: number; column: number }) => void } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorRef = useRef<any>(null);
 
   useSAPConnection();
 
-  const { reviewCode, analyzeS4, explainCode, runTests, optimizeCode } = useAIAssistant();
+  const { reviewCode, analyzeS4, explainCode, runTests, optimizeCode, fixError, sendPrompt } = useAIAssistant();
 
   // Initialize MCP connection
   useEffect(() => {
@@ -96,12 +99,16 @@ export default function App() {
     try {
       appendOutput(`Activating ${tab.objectName}...`);
       const result = await activateObject(tab.objectName, tab.objectType, source);
-      markDirty(tab.id, false);
-      appendOutput(
-        result.success
-          ? `Activated ${tab.objectName}`
-          : `Activation failed: ${result.messages?.map((m) => m.text).join(', ')}`,
-      );
+      if (result.success) {
+        markDirty(tab.id, false);
+        appendOutput(`Activated ${tab.objectName}`);
+      } else {
+        appendOutput(`Activation failed for ${tab.objectName}:`);
+        for (const m of result.messages ?? []) {
+          const line = m.line ? ` (Line ${m.line})` : '';
+          appendOutput(`  [${m.severity?.toUpperCase() ?? 'ERROR'}]${line} ${m.text}`);
+        }
+      }
     } catch (err) {
       appendOutput(`Activation error: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -117,7 +124,7 @@ export default function App() {
       appendOutput(`Running syntax check on ${tab.objectName}...`);
       const source = tab.model.getValue();
       const result = await syntaxCheck(tab.objectName, tab.objectType, source);
-      const diagnostics = result.messages.map((m) => ({
+      const diagnostics: DiagnosticItem[] = result.messages.map((m) => ({
         severity: m.severity,
         message: m.text,
         startLineNumber: m.line,
@@ -127,12 +134,40 @@ export default function App() {
         source: 'SAP',
         code: m.code,
       }));
-      setDiagnostics(tab.id, diagnostics);
-      appendOutput(
-        diagnostics.length === 0
-          ? `Syntax check OK for ${tab.objectName}`
-          : `${diagnostics.length} issue(s) found`,
+      setDiagnostics(tab.id, 'SAP', diagnostics);
+
+      // Set Monaco markers for squiggly underlines
+      const sevMap: Record<string, monaco.MarkerSeverity> = {
+        error: monaco.MarkerSeverity.Error,
+        warning: monaco.MarkerSeverity.Warning,
+        info: monaco.MarkerSeverity.Info,
+        hint: monaco.MarkerSeverity.Hint,
+      };
+      monaco.editor.setModelMarkers(
+        tab.model,
+        'sap',
+        diagnostics.map((d) => ({
+          severity: sevMap[d.severity] ?? monaco.MarkerSeverity.Error,
+          message: d.message,
+          startLineNumber: d.startLineNumber,
+          startColumn: d.startColumn,
+          endLineNumber: d.endLineNumber,
+          endColumn: d.endColumn,
+          source: 'SAP',
+        })),
       );
+
+      if (diagnostics.length === 0) {
+        appendOutput(`Syntax check OK for ${tab.objectName}`);
+        // Clear SAP markers
+        monaco.editor.setModelMarkers(tab.model, 'sap', []);
+      } else {
+        appendOutput(`${diagnostics.length} issue(s) found:`);
+        for (const d of diagnostics) {
+          const sev = d.severity.toUpperCase();
+          appendOutput(`  [${sev}] Line ${d.startLineNumber}: ${d.message}`);
+        }
+      }
     } catch (err) {
       appendOutput(`Syntax check error: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -159,9 +194,52 @@ export default function App() {
     [],
   );
 
+  const handleFormatCode = useCallback(async () => {
+    const tab = useEditorStore.getState().getActiveTab();
+    if (!tab || tab.readOnly) return;
+    const appendOutput = useEditorStore.getState().appendOutput;
+    try {
+      appendOutput(`Formatting ${tab.objectName}...`);
+      const source = tab.model.getValue();
+      const formatted = await formatCode(source);
+      if (formatted !== source) {
+        tab.model.pushEditOperations(
+          [],
+          [{ range: tab.model.getFullModelRange(), text: formatted }],
+          () => null,
+        );
+        appendOutput(`Formatted ${tab.objectName}`);
+      } else {
+        appendOutput(`No formatting changes for ${tab.objectName}`);
+      }
+    } catch (err) {
+      appendOutput(`Format error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, []);
+
+  const handleFixError = useCallback(
+    (diagnostic: DiagnosticItem) => {
+      const tab = useEditorStore.getState().getActiveTab();
+      if (!tab) return;
+      useSettingsStore.setState({ rightPanelVisible: true });
+      fixError(
+        diagnostic.message,
+        diagnostic.startLineNumber,
+        tab.model.getValue(),
+        tab.objectType,
+        tab.objectName,
+      );
+    },
+    [fixError],
+  );
+
   const handleNavigateToLine = useCallback((line: number, column: number) => {
     editorRef.current?.setPosition({ lineNumber: line, column });
     editorRef.current?.revealLineInCenter(line);
+  }, []);
+
+  const handleEditorReady = useCallback((editor: unknown) => {
+    editorRef.current = editor;
   }, []);
 
   // AI action helpers — get active tab context and open right panel
@@ -202,6 +280,37 @@ export default function App() {
     useAIStore.getState().clearMessages();
   }, []);
 
+  const handleSendPrompt = useCallback(
+    (text: string) => {
+      const tab = useEditorStore.getState().getActiveTab();
+      useSettingsStore.setState({ rightPanelVisible: true });
+
+      // Use selected text if available, otherwise full source
+      let source = tab?.model.getValue() ?? '';
+      let isSelection = false;
+      const editor = editorRef.current;
+      if (editor && tab) {
+        const selection = editor.getSelection();
+        if (selection && !selection.isEmpty()) {
+          const selectedText = editor.getModel()?.getValueInRange(selection) ?? '';
+          if (selectedText) {
+            source = selectedText;
+            isSelection = true;
+          }
+        }
+      }
+
+      sendPrompt(
+        text,
+        tab?.objectType ?? '',
+        tab?.objectName ?? '',
+        source,
+        isSelection,
+      );
+    },
+    [sendPrompt],
+  );
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -239,6 +348,10 @@ export default function App() {
         e.preventDefault();
         setNewObjectDialogOpen(true);
       }
+      if (e.shiftKey && e.altKey && e.key === 'F') {
+        e.preventDefault();
+        handleFormatCode();
+      }
       // AI shortcuts
       if (mod && e.shiftKey && e.key === 'R') {
         e.preventDefault();
@@ -252,7 +365,7 @@ export default function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSave, handleActivate, handleSyntaxCheck, toggleSidebar, toggleBottomPanel, toggleRightPanel, handleAIReview, handleAIS4Check]);
+  }, [handleSave, handleActivate, handleSyntaxCheck, toggleSidebar, toggleBottomPanel, toggleRightPanel, handleAIReview, handleAIS4Check, handleFormatCode]);
 
   // Apply theme class on <html>
   useEffect(() => {
@@ -286,6 +399,7 @@ export default function App() {
         onAIExplain={handleAIExplain}
         onAIRunTests={handleAIRunTests}
         onAIClear={handleAIClear}
+        onFormatCode={handleFormatCode}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -293,9 +407,9 @@ export default function App() {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <TabBar />
-          <ABAPEditor onCursorChange={handleCursorChange} />
+          <ABAPEditor onCursorChange={handleCursorChange} onEditorReady={handleEditorReady} />
           <BottomPanel
-            problemsContent={<ProblemsPanel onNavigate={handleNavigateToLine} />}
+            problemsContent={<ProblemsPanel onNavigate={handleNavigateToLine} onFixError={handleFixError} />}
             outputContent={<OutputPanel />}
             transpilerContent={<TranspilerPanel />}
           />
@@ -308,7 +422,9 @@ export default function App() {
             onExplain={handleAIExplain}
             onRunTests={handleAIRunTests}
             onOptimize={handleAIOptimize}
+            onFormatCode={handleFormatCode}
             onNavigateToLine={handleNavigateToLine}
+            onSendPrompt={handleSendPrompt}
           />
         </RightPanel>
       </div>

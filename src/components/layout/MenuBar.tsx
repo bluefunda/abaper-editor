@@ -13,6 +13,7 @@ interface MenuBarProps {
   onAIExplain?: () => void;
   onAIRunTests?: () => void;
   onAIClear?: () => void;
+  onFormatCode?: () => void;
 }
 
 interface MenuItem {
@@ -39,6 +40,7 @@ export function MenuBar({
   onAIExplain,
   onAIRunTests,
   onAIClear,
+  onFormatCode,
 }: MenuBarProps) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuBarRef = useRef<HTMLDivElement>(null);
@@ -76,6 +78,7 @@ export function MenuBar({
     {
       label: 'AI',
       items: [
+        { label: 'Format Code', action: onFormatCode, shortcut: 'Shift+Alt+F' },
         { label: 'Review Code', action: onAIReview, shortcut: 'Ctrl+Shift+R' },
         { label: 'S/4HANA Check', action: onAIS4Check, shortcut: 'Ctrl+Shift+4' },
         { label: 'Explain Code', action: onAIExplain },

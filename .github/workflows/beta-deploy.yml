@@ -1,13 +1,13 @@
-name: Build & Deploy
+name: Beta Build & Deploy
 
 on:
   push:
-    branches: [main]
+    branches: ['feat/**']
   workflow_dispatch:
 
 env:
   IMAGE_NAME: bdadevops/abaper-editor
-  IMAGE_TAG: latest
+  IMAGE_TAG: beta
 
 jobs:
   test:
@@ -44,7 +44,7 @@ jobs:
           retention-days: 7
 
   build-and-push:
-    name: Build & Push Docker Image
+    name: Build & Push Beta Docker Image
     needs: test
     runs-on: ubuntu-latest
     steps:

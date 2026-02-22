@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { FolderOpen, Search, GitBranch, Github, LogOut, Bot } from 'lucide-react';
 import { useSettingsStore, type SidebarPanel } from '../../stores/settingsStore';
+import { useResizable } from '../../hooks/useResizable';
 import { getUsername, getRealm, logout } from '../../services/auth';
 import { Icon } from '../common/Icon';
 
@@ -75,7 +76,16 @@ function UserMenu() {
 }
 
 export function Sidebar({ children }: SidebarProps) {
-  const { sidebarVisible, sidebarPanel, setSidebarPanel, toggleSidebar, rightPanelVisible, toggleRightPanel } = useSettingsStore();
+  const { sidebarVisible, sidebarPanel, setSidebarPanel, toggleSidebar, rightPanelVisible, toggleRightPanel, sidebarWidth, setSidebarWidth } = useSettingsStore();
+
+  const onResize = useCallback((size: number) => setSidebarWidth(size), [setSidebarWidth]);
+  const { onMouseDown } = useResizable({
+    direction: 'horizontal',
+    initialSize: sidebarWidth,
+    min: 160,
+    max: 480,
+    onResize,
+  });
 
   if (!sidebarVisible) return null;
 
@@ -122,11 +132,19 @@ export function Sidebar({ children }: SidebarProps) {
         </div>
       </div>
       {/* Panel area */}
-      <div className="w-60 bg-sidebar-bg border-r border-panel-border flex flex-col overflow-hidden">
+      <div
+        className="bg-sidebar-bg border-r border-panel-border flex flex-col overflow-hidden relative"
+        style={{ width: sidebarWidth }}
+      >
         <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-fg/60">
           {panelTitles[sidebarPanel]}
         </div>
         <div className="flex-1 overflow-auto">{children}</div>
+        {/* Resize handle */}
+        <div
+          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-accent/50 active:bg-accent/70 transition-colors z-10"
+          onMouseDown={onMouseDown}
+        />
       </div>
     </div>
   );

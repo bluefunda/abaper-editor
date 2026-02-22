@@ -15,6 +15,7 @@ interface SettingsState {
   bottomPanelHeight: number;
   rightPanelVisible: boolean;
   rightPanelWidth: number;
+  sidebarWidth: number;
 
   setTheme: (theme: Theme) => void;
   setFontSize: (size: number) => void;
@@ -25,6 +26,7 @@ interface SettingsState {
   setBottomPanelHeight: (height: number) => void;
   toggleRightPanel: () => void;
   setRightPanelWidth: (width: number) => void;
+  setSidebarWidth: (width: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -39,6 +41,7 @@ export const useSettingsStore = create<SettingsState>()(
       bottomPanelHeight: 200,
       rightPanelVisible: false,
       rightPanelWidth: 350,
+      sidebarWidth: 240,
 
       setTheme: (theme) => set({ theme }),
       setFontSize: (size) => set({ fontSize: size }),
@@ -49,6 +52,7 @@ export const useSettingsStore = create<SettingsState>()(
       setBottomPanelHeight: (height) => set({ bottomPanelHeight: height }),
       toggleRightPanel: () => set((s) => ({ rightPanelVisible: !s.rightPanelVisible })),
       setRightPanelWidth: (width) => set({ rightPanelWidth: width }),
+      setSidebarWidth: (width) => set({ sidebarWidth: width }),
     }),
     {
       name: 'abaper-settings',

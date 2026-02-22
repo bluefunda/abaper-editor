@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { abaperMCP, extractText, extractJSON } from '../services/mcp';
+import { streamChat } from '../services/cai';
 import { useAIStore } from '../stores/aiStore';
 import type { ReviewFinding, S4RemediationResult, S4RemediationIssue } from '../types/mcp';
 
@@ -229,5 +230,104 @@ export function useAIAssistant() {
     [addMessage, setAnalyzing],
   );
 
-  return { reviewCode, analyzeS4, explainCode, runTests, optimizeCode };
+  const fixError = useCallback(
+    async (errorMessage: string, line: number, _source: string, objectType: string, objectName: string) => {
+      setAnalyzing(true);
+      addMessage({ role: 'user', content: `Fix error on line ${line}: ${errorMessage}` });
+      try {
+        const result = await abaperMCP.callTool('analyze-s4-remediation', {
+          object_type: objectType,
+          object_name: objectName,
+        });
+        const markdown = extractText(result);
+        addMessage({
+          role: 'assistant',
+          content: markdown || `No fix suggestion available for: ${errorMessage}`,
+          toolCalls: [
+            { name: 'analyze-s4-remediation', args: { object_type: objectType, object_name: objectName } },
+          ],
+        });
+      } catch (err) {
+        if (!isCancelled()) {
+          addMessage({
+            role: 'assistant',
+            content: `Fix analysis failed: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
+      } finally {
+        if (!isCancelled()) setAnalyzing(false);
+      }
+    },
+    [addMessage, setAnalyzing],
+  );
+
+  const sendPrompt = useCallback(
+    async (text: string, objectType: string, objectName: string, source: string, isSelection = false) => {
+      const store = useAIStore.getState();
+      setAnalyzing(true);
+      addMessage({ role: 'user', content: text });
+
+      // Add placeholder assistant message for streaming
+      addMessage({ role: 'assistant', content: '' });
+
+      const isNew = !store.chatId;
+      const chatId = store.chatId || crypto.randomUUID();
+      store.setChatId(chatId);
+      store.resetStreamContent();
+      store.setStreaming(true);
+
+      const signal = store.getAbortSignal();
+
+      // Build prompt with active editor context
+      let prompt = text;
+      if (source) {
+        const label = isSelection ? 'Selected code' : 'Active file';
+        const header = objectName
+          ? `[${label} from ${objectType} ${objectName}]`
+          : `[${label}]`;
+        prompt = `${header}\n\`\`\`abap\n${source}\n\`\`\`\n\n${text}`;
+      }
+
+      try {
+        await streamChat(
+          {
+            chat_id: chatId,
+            prompt,
+            model: store.selectedModel,
+            mcp_server_name: 'abaper-mcp',
+            is_new_chat: isNew,
+          },
+          signal,
+          (event) => {
+            const s = useAIStore.getState();
+            if (event.type === 'stream_chunk' && event.content) {
+              s.appendStreamContent(event.content);
+              s.updateLastMessage(s.streamingContent + event.content);
+            } else if (event.type === 'stream_end') {
+              if (event.full_content) {
+                s.updateLastMessage(event.full_content);
+              }
+              s.setStreaming(false);
+            } else if (event.type === 'error' || event.type === 'stream_error') {
+              s.updateLastMessage(`Error: ${event.error || event.message || 'Unknown error'}`);
+              s.setStreaming(false);
+            }
+          },
+        );
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError' && !isCancelled()) {
+          const s = useAIStore.getState();
+          s.updateLastMessage(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      } finally {
+        const s = useAIStore.getState();
+        s.setStreaming(false);
+        s.resetStreamContent();
+        if (!isCancelled()) setAnalyzing(false);
+      }
+    },
+    [addMessage, setAnalyzing],
+  );
+
+  return { reviewCode, analyzeS4, explainCode, runTests, optimizeCode, fixError, sendPrompt };
 }

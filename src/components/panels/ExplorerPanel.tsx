@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
-  Search, FileCode, ChevronRight, ChevronDown, FolderOpen, Plus, X, Pin,
+  Search, FileCode, ChevronRight, ChevronDown, FolderOpen, Plus, X,
   Box, Circle, Layers, Table, Server,
 } from 'lucide-react';
 import { searchObjects, getPackageContents } from '../../services/api';
@@ -10,6 +10,9 @@ import { PackageSearchPopover } from './PackageSearchPopover';
 import { Icon } from '../common/Icon';
 import { Spinner } from '../common/Spinner';
 import type { ADTObject } from '../../types/adt';
+
+const EMPTY_STRINGS: string[] = [];
+const EMPTY_TREE: Record<string, PackageTreeNode[]> = {};
 
 interface ExplorerPanelProps {
   onOpenObject: (name: string, type: string) => void;
@@ -46,23 +49,18 @@ function PackageTreeNodeItem({
   depth: number;
   onOpenObject: (name: string, type: string) => void;
 }) {
-  const expandedPaths = useFavoritePackagesStore((s) => s.expandedPaths);
-  const loadingPaths = useFavoritePackagesStore((s) => s.loadingPaths);
-  const toggleExpanded = useFavoritePackagesStore((s) => s.toggleExpanded);
-  const setPackageChildren = useFavoritePackagesStore((s) => s.setPackageChildren);
-  const setLoading = useFavoritePackagesStore((s) => s.setLoading);
-
-  const isExpanded = expandedPaths.includes(path);
-  const isLoading = loadingPaths.includes(path);
+  const isExpanded = useFavoritePackagesStore((s) => s.expandedPaths.includes(path));
+  const isLoading = useFavoritePackagesStore((s) => s.loadingPaths.includes(path));
   const isExpandable = node.expandable;
   const { icon, color } = getTypeIcon(node.type);
 
   const handleClick = useCallback(async () => {
     if (!isExpandable) return;
-    toggleExpanded(path);
+    const store = useFavoritePackagesStore.getState();
+    store.toggleExpanded(path);
 
-    if (!isExpanded && node.children === undefined) {
-      setLoading(path, true);
+    if (!store.expandedPaths.includes(path) && node.children === undefined) {
+      store.setLoading(path, true);
       try {
         const result = await getPackageContents(node.name);
         const children: PackageTreeNode[] = result.nodes.map((n) => ({
@@ -72,12 +70,12 @@ function PackageTreeNodeItem({
           expandable: n.expandable,
           children: undefined,
         }));
-        setPackageChildren(path, children);
+        useFavoritePackagesStore.getState().setPackageChildren(path, children);
       } catch {
-        setLoading(path, false);
+        useFavoritePackagesStore.getState().setLoading(path, false);
       }
     }
-  }, [isExpandable, isExpanded, node, path, toggleExpanded, setPackageChildren, setLoading]);
+  }, [isExpandable, node, path]);
 
   const handleDoubleClick = useCallback(() => {
     if (!isExpandable) {
@@ -148,18 +146,11 @@ export function ExplorerPanel({ onOpenObject, onAddSystem }: ExplorerPanelProps)
   const activeSystemId = useSystemStore((s) => s.activeSystemId);
   const setActiveSystem = useSystemStore((s) => s.setActiveSystem);
 
-  const favorites = useFavoritePackagesStore((s) => {
-    return activeSystemId ? s.favoritesBySystem[activeSystemId] ?? [] : [];
-  });
-  const trees = useFavoritePackagesStore((s) => s.trees);
-  const expandedPaths = useFavoritePackagesStore((s) => s.expandedPaths);
-  const loadingPaths = useFavoritePackagesStore((s) => s.loadingPaths);
-  const addFavorite = useFavoritePackagesStore((s) => s.addFavorite);
-  const removeFavorite = useFavoritePackagesStore((s) => s.removeFavorite);
-  const toggleExpanded = useFavoritePackagesStore((s) => s.toggleExpanded);
-  const setPackageChildren = useFavoritePackagesStore((s) => s.setPackageChildren);
-  const setLoading = useFavoritePackagesStore((s) => s.setLoading);
-  const clearTrees = useFavoritePackagesStore((s) => s.clearTrees);
+  const favoritesBySystem = useFavoritePackagesStore((s) => s.favoritesBySystem);
+  const favorites = (activeSystemId ? favoritesBySystem[activeSystemId] : undefined) ?? EMPTY_STRINGS;
+  const trees = useFavoritePackagesStore((s) => s.trees) ?? EMPTY_TREE;
+  const expandedPaths = useFavoritePackagesStore((s) => s.expandedPaths) ?? EMPTY_STRINGS;
+  const loadingPaths = useFavoritePackagesStore((s) => s.loadingPaths) ?? EMPTY_STRINGS;
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ADTObject[]>([]);
@@ -169,8 +160,8 @@ export function ExplorerPanel({ onOpenObject, onAddSystem }: ExplorerPanelProps)
 
   // Clear trees when active system changes
   useEffect(() => {
-    clearTrees();
-  }, [activeSystemId, clearTrees]);
+    useFavoritePackagesStore.getState().clearTrees();
+  }, [activeSystemId]);
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
@@ -188,11 +179,12 @@ export function ExplorerPanel({ onOpenObject, onAddSystem }: ExplorerPanelProps)
 
   const handleExpandFavorite = useCallback(async (pkgName: string) => {
     const path = pkgName;
-    toggleExpanded(path);
+    const store = useFavoritePackagesStore.getState();
+    store.toggleExpanded(path);
 
-    const isCurrentlyExpanded = expandedPaths.includes(path);
-    if (!isCurrentlyExpanded && !trees[pkgName]) {
-      setLoading(path, true);
+    const isCurrentlyExpanded = store.expandedPaths.includes(path);
+    if (!isCurrentlyExpanded && !store.trees[pkgName]) {
+      store.setLoading(path, true);
       try {
         const result = await getPackageContents(pkgName);
         const children: PackageTreeNode[] = result.nodes.map((n) => ({
@@ -202,24 +194,26 @@ export function ExplorerPanel({ onOpenObject, onAddSystem }: ExplorerPanelProps)
           expandable: n.expandable,
           children: undefined,
         }));
-        setPackageChildren(path, children);
+        useFavoritePackagesStore.getState().setPackageChildren(path, children);
       } catch {
-        setLoading(path, false);
+        useFavoritePackagesStore.getState().setLoading(path, false);
       }
     }
-  }, [toggleExpanded, expandedPaths, trees, setPackageChildren, setLoading]);
+  }, []);
 
   const handlePinPackage = useCallback((packageName: string) => {
-    if (activeSystemId) {
-      addFavorite(activeSystemId, packageName);
+    const sysId = useSystemStore.getState().activeSystemId;
+    if (sysId) {
+      useFavoritePackagesStore.getState().addFavorite(sysId, packageName);
     }
-  }, [activeSystemId, addFavorite]);
+  }, []);
 
   const handleUnpinPackage = useCallback((packageName: string) => {
-    if (activeSystemId) {
-      removeFavorite(activeSystemId, packageName);
+    const sysId = useSystemStore.getState().activeSystemId;
+    if (sysId) {
+      useFavoritePackagesStore.getState().removeFavorite(sysId, packageName);
     }
-  }, [activeSystemId, removeFavorite]);
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
@@ -279,17 +273,18 @@ export function ExplorerPanel({ onOpenObject, onAddSystem }: ExplorerPanelProps)
               Favorite Packages
             </span>
             <button
-              className="p-0.5 text-sidebar-fg/40 hover:text-sidebar-fg rounded"
+              className="flex items-center gap-0.5 px-1.5 py-0.5 text-sidebar-fg/60 hover:text-sidebar-fg hover:bg-white/10 rounded text-xs"
               onClick={() => setPinPopoverOpen(true)}
               title="Pin a package"
             >
-              <Icon icon={Pin} size={13} />
+              <Icon icon={Plus} size={12} />
+              <span>Pin</span>
             </button>
           </div>
 
           {favorites.length === 0 && (
             <div className="px-3 py-2 text-sidebar-fg/30 text-xs">
-              No pinned packages. Click + to add.
+              No pinned packages. Click "+ Pin" above to add.
             </div>
           )}
 

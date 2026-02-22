@@ -7,8 +7,6 @@ import { setBaseUrl, fetchJSONForSystem } from '../services/api';
 export function useSAPConnection() {
   const backendUrl = useConnectionStore((s) => s.backendUrl);
   const setStatus = useConnectionStore((s) => s.setStatus);
-  const systems = useSystemStore((s) => s.systems);
-  const setSystemStatus = useSystemStore((s) => s.setSystemStatus);
 
   useEffect(() => {
     // In dev mode, use relative URLs so Vite proxy handles API calls
@@ -18,7 +16,8 @@ export function useSAPConnection() {
       const status = await checkConnection();
       setStatus(status);
 
-      // Poll each configured system
+      // Read systems from store snapshot (not from React state) to avoid re-render loops
+      const { systems, setSystemStatus } = useSystemStore.getState();
       for (const sys of systems) {
         try {
           setSystemStatus(sys.id, 'checking');
@@ -37,5 +36,5 @@ export function useSAPConnection() {
     poll();
     const interval = setInterval(poll, 15_000);
     return () => clearInterval(interval);
-  }, [backendUrl, setStatus, systems.length, setSystemStatus]);
+  }, [backendUrl, setStatus]);
 }

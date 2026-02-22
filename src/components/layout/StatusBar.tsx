@@ -3,6 +3,7 @@ import { useEditorStore } from '../../stores/editorStore';
 import { useSystemStore } from '../../stores/systemStore';
 import { ConnectionStatus } from '../../types/lsp';
 import { getUsername, getRealm, logout } from '../../services/auth';
+import { TransportIndicator } from '../common/TransportIndicator';
 
 interface StatusBarProps {
   cursorLine: number;
@@ -67,6 +68,9 @@ export function StatusBar({ cursorLine, cursorColumn }: StatusBarProps) {
           <span>{activeTab.objectName}</span>
         </div>
       )}
+
+      {/* Transport indicator */}
+      <TransportIndicator />
 
       <div className="flex-1" />
 

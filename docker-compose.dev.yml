@@ -24,6 +24,8 @@ services:
   abaper-mcp:
     build:
       context: ../../Downloads/src/abaper-mcp
+      args:
+        GH_PAT: ${GH_PAT:-}
     ports:
       - "8015:8015"
     environment:
@@ -41,6 +43,32 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+
+  # Go backend — GitHub API proxy (OAuth, repos, branches, files)
+  abaper-go:
+    build:
+      context: ../../Downloads/src/abaper
+      dockerfile_inline: |
+        FROM golang:1.25-alpine AS builder
+        WORKDIR /app
+        COPY go.mod go.sum ./
+        RUN go mod download
+        COPY . .
+        RUN go build -o abaper .
+        FROM alpine:latest
+        RUN apk --no-cache add ca-certificates
+        WORKDIR /app
+        COPY --from=builder /app/abaper .
+        CMD ["./abaper", "server", "-p", "8086"]
+    ports:
+      - "8086:8086"
+    env_file: .env.dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8086/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   gateway:
     build:

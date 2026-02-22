@@ -3,9 +3,11 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
-// LOCAL=1 npm run dev → proxy to local stack (gateway + MCP)
-// npm run dev          → proxy through production
+// LOCAL=1 npm run dev   → proxy to local stack (gateway + MCP)
+// NOAUTH=1 npm run dev  → proxy SAP endpoints directly to abaper-ts, GitHub through production
+// npm run dev            → proxy through production
 const isLocal = !!process.env.LOCAL;
+const noAuth = !!process.env.NOAUTH;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -15,12 +17,21 @@ export default defineConfig({
     },
   },
   server: {
+    port: 5173,
+    strictPort: true,
     proxy: {
-      '/api': {
-        target: isLocal ? 'http://localhost:8083' : 'https://abaper.bluefunda.com',
+      // GitHub API routes → local Go backend in dev, production otherwise
+      '/api/v1/github': {
+        target: isLocal || noAuth ? 'http://localhost:8086' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
-        secure: !isLocal,
-        rewrite: isLocal ? (p) => `/abaper${p}` : undefined,
+        secure: !isLocal && !noAuth,
+      },
+      // SAP/ADT API routes
+      '/api': {
+        target: noAuth ? 'http://localhost:8085' : isLocal ? 'http://localhost:8083' : 'https://abaper.bluefunda.com',
+        changeOrigin: true,
+        secure: !isLocal && !noAuth,
+        rewrite: isLocal && !noAuth ? (p) => `/abaper${p}` : undefined,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             console.log(`[proxy] ${req.method} ${req.url} → ${proxyReq.path}`);
@@ -34,16 +45,38 @@ export default defineConfig({
         },
       },
       '/health': {
-        target: isLocal ? 'http://localhost:8083' : 'https://abaper.bluefunda.com',
+        target: noAuth ? 'http://localhost:8085' : isLocal ? 'http://localhost:8083' : 'https://abaper.bluefunda.com',
+        changeOrigin: true,
+        secure: !isLocal && !noAuth,
+        rewrite: isLocal && !noAuth ? (p) => `/abaper${p}` : undefined,
+      },
+      // CAI (Convo AI) streaming → always api.bluefunda.com/ai (LOCAL=1 overrides to local)
+      '/cai': {
+        target: isLocal ? 'http://localhost:8081' : 'https://api.bluefunda.com',
         changeOrigin: true,
         secure: !isLocal,
-        rewrite: isLocal ? (p) => `/abaper${p}` : undefined,
+        rewrite: isLocal
+          ? (p: string) => p.replace(/^\/cai/, '')
+          : (p: string) => p.replace(/^\/cai/, '/ai'),
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            console.log(`[cai-proxy] ${req.method} ${req.url} → ${proxyReq.path}`);
+          });
+          proxy.on('proxyRes', (proxyRes, req) => {
+            console.log(`[cai-proxy] ${req.url} ← ${proxyRes.statusCode}`);
+            if (proxyRes.headers['content-type']?.includes('text/event-stream') ||
+                proxyRes.headers['content-type']?.includes('application/x-ndjson')) {
+              proxyRes.headers['cache-control'] = 'no-cache';
+              proxyRes.headers['x-accel-buffering'] = 'no';
+            }
+          });
+        },
       },
       '/mcp/abaper': {
-        target: isLocal ? 'http://localhost:8015' : 'https://abaper.bluefunda.com',
+        target: isLocal || noAuth ? 'http://localhost:8015' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
-        secure: !isLocal,
-        rewrite: isLocal ? (p) => p.replace(/^\/mcp\/abaper/, '') : undefined,
+        secure: !isLocal && !noAuth,
+        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/mcp\/abaper/, '') : undefined,
         // SSE needs these to avoid buffering
         configure: (proxy) => {
           proxy.on('proxyRes', (proxyRes) => {
@@ -55,10 +88,10 @@ export default defineConfig({
         },
       },
       '/mcp/github': {
-        target: isLocal ? 'http://localhost:8020' : 'https://abaper.bluefunda.com',
+        target: isLocal || noAuth ? 'http://localhost:8020' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
-        secure: !isLocal,
-        rewrite: isLocal ? (p) => p.replace(/^\/mcp\/github/, '') : undefined,
+        secure: !isLocal && !noAuth,
+        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/mcp\/github/, '') : undefined,
       },
     },
   },
@@ -73,6 +106,7 @@ export default defineConfig({
           abaplint: ['@abaplint/core'],
           transpiler: ['@abaplint/transpiler'],
           react: ['react', 'react-dom'],
+          markdown: ['react-markdown', 'remark-gfm', 'react-syntax-highlighter'],
         },
       },
     },

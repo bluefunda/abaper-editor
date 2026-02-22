@@ -54,7 +54,19 @@ export interface PackageContentsResult {
 
 export interface CompletionProposal {
   identifier: string;
+  kind: number;
+  insert_text: string;
+}
+
+export interface TransportEntry {
+  transport: string;
   description: string;
-  kind: 'keyword' | 'function' | 'variable' | 'class' | 'type';
-  insert_text?: string;
+  owner: string;
+  status: string;
+}
+
+export interface TransportInfo {
+  local: boolean;
+  package_name: string;
+  transports: TransportEntry[];
 }

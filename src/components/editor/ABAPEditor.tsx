@@ -8,9 +8,10 @@ import type * as monacoNs from 'monaco-editor';
 
 interface ABAPEditorProps {
   onCursorChange: (line: number, column: number) => void;
+  onEditorReady?: (editor: monacoNs.editor.IStandaloneCodeEditor) => void;
 }
 
-export function ABAPEditor({ onCursorChange }: ABAPEditorProps) {
+export function ABAPEditor({ onCursorChange, onEditorReady }: ABAPEditorProps) {
   const { editorRef, beforeMount, onMount: baseOnMount } = useABAPEditor();
   const [mounted, setMounted] = useState(false);
   const activeTabId = useEditorStore((s) => s.activeTabId);
@@ -24,12 +25,13 @@ export function ABAPEditor({ onCursorChange }: ABAPEditorProps) {
     (editor: monacoNs.editor.IStandaloneCodeEditor) => {
       baseOnMount(editor);
       setMounted(true);
+      onEditorReady?.(editor);
 
       editor.onDidChangeCursorPosition((e) => {
         onCursorChange(e.position.lineNumber, e.position.column);
       });
     },
-    [baseOnMount, onCursorChange],
+    [baseOnMount, onCursorChange, onEditorReady],
   );
 
   // Switch model when active tab changes or editor mounts

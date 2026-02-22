@@ -1,5 +1,6 @@
-import type { MCPRequest, MCPResponse, MCPToolCallResult } from '../types/mcp';
+import type { MCPRequest, MCPResponse, MCPToolCallResult, MCPToolInfo } from '../types/mcp';
 import { getToken, getRealm, refreshToken } from './auth';
+import { useAIStore } from '../stores/aiStore';
 
 let nextId = 1;
 
@@ -132,6 +133,17 @@ export class SSEMCPClient {
     return result as MCPToolCallResult;
   }
 
+  async listTools(): Promise<MCPToolInfo[]> {
+    if (!this.initialized) {
+      throw new Error('SSE client not initialized. Call connect() first.');
+    }
+    const result = await this.sendRequest('tools/list', {}) as { tools?: { name: string; description?: string }[] };
+    return (result.tools ?? []).map((t) => ({
+      name: t.name,
+      description: t.description ?? '',
+    }));
+  }
+
   disconnect(): void {
     this.eventSource?.close();
     this.eventSource = null;
@@ -196,8 +208,19 @@ export const githubMCP = new StreamableHTTPClient(`${MCP_BASE}/mcp/github`);
 export async function initMCP(): Promise<void> {
   try {
     await abaperMCP.connect(`${MCP_BASE}/mcp/abaper`);
+    useAIStore.getState().setMcpConnected(true);
+
+    // Fetch available tools
+    try {
+      const tools = await abaperMCP.listTools();
+      useAIStore.getState().setMcpTools(tools);
+      console.log(`MCP: ${tools.length} tools available`);
+    } catch (err) {
+      console.warn('Failed to list MCP tools:', err);
+    }
   } catch (err) {
     console.warn('Failed to connect to abaper-mcp:', err);
+    useAIStore.getState().setMcpConnected(false);
   }
 }
 

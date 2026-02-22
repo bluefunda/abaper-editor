@@ -1,4 +1,4 @@
-import type { ADTSourceCode, ADTObject, SyntaxCheckResult, ActivationResult, PackageContentsResult } from '../types/adt';
+import type { ADTSourceCode, ADTObject, SyntaxCheckResult, ActivationResult, PackageContentsResult, CompletionProposal, TransportInfo } from '../types/adt';
 import { getToken, getRealm, refreshToken } from './auth';
 import { useSystemStore, type SAPSystem } from '../stores/systemStore';
 
@@ -55,7 +55,11 @@ async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`API error ${res.status}: ${text}`);
   }
-  return res.json() as Promise<T>;
+  const json = await res.json();
+  if (json && typeof json === 'object' && 'success' in json && !json.success) {
+    throw new Error(json.error || 'API request failed');
+  }
+  return json as T;
 }
 
 export async function fetchJSONForSystem<T>(system: SAPSystem, path: string, options?: RequestInit): Promise<T> {
@@ -187,6 +191,52 @@ export async function syntaxCheck(
       object_type: objectType,
       source,
     }),
+  });
+  return res.data;
+}
+
+export async function formatCode(source: string): Promise<string> {
+  const res = await fetchJSON<APIResponse<{ source: string }>>('/api/v1/format', {
+    method: 'POST',
+    body: JSON.stringify({ source }),
+  });
+  return res.data.source;
+}
+
+export async function getCompletionProposals(
+  objectType: string,
+  objectName: string,
+  source: string,
+  line: number,
+  column: number,
+): Promise<CompletionProposal[]> {
+  const res = await fetchJSON<APIResponse<CompletionProposal[]>>('/api/v1/completion', {
+    method: 'POST',
+    body: JSON.stringify({
+      object_type: objectType,
+      object_name: objectName,
+      source,
+      line,
+      column,
+    }),
+  });
+  return res.data ?? [];
+}
+
+export async function getTransportInfo(): Promise<TransportInfo> {
+  const res = await fetchJSON<APIResponse<TransportInfo>>('/api/v1/transports/info', {
+    method: 'POST',
+  });
+  return res.data;
+}
+
+export async function createTransport(
+  description: string,
+  targetPackage?: string,
+): Promise<{ transport: string }> {
+  const res = await fetchJSON<APIResponse<{ transport: string }>>('/api/v1/transports/create', {
+    method: 'POST',
+    body: JSON.stringify({ description, package: targetPackage }),
   });
   return res.data;
 }

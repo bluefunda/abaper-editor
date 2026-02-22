@@ -66,7 +66,7 @@ interface EditorState {
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   markDirty: (id: string, dirty: boolean) => void;
-  setDiagnostics: (id: string, diagnostics: DiagnosticItem[]) => void;
+  setDiagnostics: (id: string, source: string, diagnostics: DiagnosticItem[]) => void;
   appendOutput: (line: string) => void;
   clearOutput: () => void;
   getActiveTab: () => TabState | undefined;
@@ -170,10 +170,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       tabs: state.tabs.map((t) => (t.id === id ? { ...t, isDirty: dirty } : t)),
     })),
 
-  setDiagnostics: (id, diagnostics) =>
-    set((state) => ({
-      diagnosticsMap: { ...state.diagnosticsMap, [id]: diagnostics },
-    })),
+  setDiagnostics: (id, source, diagnostics) =>
+    set((state) => {
+      const existing = state.diagnosticsMap[id] ?? [];
+      const filtered = existing.filter((d) => d.source !== source);
+      return {
+        diagnosticsMap: { ...state.diagnosticsMap, [id]: [...filtered, ...diagnostics] },
+      };
+    }),
 
   appendOutput: (line) =>
     set((state) => ({ outputLog: [...state.outputLog, line] })),
