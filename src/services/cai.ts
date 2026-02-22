@@ -33,8 +33,6 @@ export async function streamChat(
   const token = getToken();
   const realm = getRealm();
 
-  console.log('[cai] token?', !!token, 'realm:', realm);
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'text/event-stream',
