@@ -18,7 +18,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'NOAUTH=1 npm run dev',
+    command: 'VITE_SKIP_AUTH=true NOAUTH=1 npm run dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
