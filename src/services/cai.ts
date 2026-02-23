@@ -46,8 +46,8 @@ export async function streamChat(
     body: JSON.stringify({
       prompt: req.prompt,
       model: req.model,
-      mcp_server_name: req.mcp_server_name,
-      is_new_chat: req.is_new_chat,
+      mcpServerName: req.mcp_server_name,
+      isNewChat: req.is_new_chat,
     }),
     signal,
   });
