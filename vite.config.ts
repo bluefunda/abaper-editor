@@ -50,7 +50,29 @@ export default defineConfig({
         secure: !isLocal && !noAuth,
         rewrite: isLocal && !noAuth ? (p) => `/abaper${p}` : undefined,
       },
-      // AI (Convo AI) streaming → local ai-gw or production via abaper.bluefunda.com/ai
+      // AI routes: MCP + LLM chat streaming
+      // In LOCAL mode: /ai/mcp/* → abaper-mcp (8015), /ai/chats/* → cai-llm-router (8081)
+      // In production: everything → abaper.bluefunda.com/ai/* → abaper-gw → abaper-bff
+      '/ai/mcp/github': {
+        target: isLocal || noAuth ? 'http://localhost:8020' : 'https://abaper.bluefunda.com',
+        changeOrigin: true,
+        secure: !isLocal && !noAuth,
+        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/ai\/mcp\/github/, '') : undefined,
+      },
+      '/ai/mcp': {
+        target: isLocal || noAuth ? 'http://localhost:8015' : 'https://abaper.bluefunda.com',
+        changeOrigin: true,
+        secure: !isLocal && !noAuth,
+        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/ai\/mcp/, '') : undefined,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+              proxyRes.headers['cache-control'] = 'no-cache';
+              proxyRes.headers['x-accel-buffering'] = 'no';
+            }
+          });
+        },
+      },
       '/ai': {
         target: isLocal ? 'http://localhost:8081' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
@@ -71,27 +93,6 @@ export default defineConfig({
             }
           });
         },
-      },
-      '/mcp/abaper': {
-        target: isLocal || noAuth ? 'http://localhost:8015' : 'https://abaper.bluefunda.com',
-        changeOrigin: true,
-        secure: !isLocal && !noAuth,
-        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/mcp\/abaper/, '') : undefined,
-        // SSE needs these to avoid buffering
-        configure: (proxy) => {
-          proxy.on('proxyRes', (proxyRes) => {
-            if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
-              proxyRes.headers['cache-control'] = 'no-cache';
-              proxyRes.headers['x-accel-buffering'] = 'no';
-            }
-          });
-        },
-      },
-      '/mcp/github': {
-        target: isLocal || noAuth ? 'http://localhost:8020' : 'https://abaper.bluefunda.com',
-        changeOrigin: true,
-        secure: !isLocal && !noAuth,
-        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/mcp\/github/, '') : undefined,
       },
     },
   },
