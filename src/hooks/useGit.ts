@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { githubMCP, extractText } from '../services/mcp';
+import { githubAgent, extractText } from '../services/mcp';
 import { useGitStore } from '../stores/gitStore';
 import type { GitRepository, GitBranch, GitCommit, PullRequest } from '../types/git';
 
@@ -22,7 +22,7 @@ export function useGit() {
     async (query: string) => {
       setLoading(true);
       try {
-        const result = await githubMCP.callTool('search_repositories', { query });
+        const result = await githubAgent.callTool('search_repositories', { query });
         const text = extractText(result);
         const data = parseJSON<Record<string, unknown>[]>(text, []);
         const repos: GitRepository[] = data.map((r) => ({
@@ -53,7 +53,7 @@ export function useGit() {
     async (owner: string, repo: string) => {
       setLoading(true);
       try {
-        const result = await githubMCP.callTool('list_branches', { owner, repo });
+        const result = await githubAgent.callTool('list_branches', { owner, repo });
         const text = extractText(result);
         const data = parseJSON<Record<string, unknown>[]>(text, []);
         const branches: GitBranch[] = data.map((b) => ({
@@ -79,7 +79,7 @@ export function useGit() {
     async (owner: string, repo: string) => {
       setLoading(true);
       try {
-        const result = await githubMCP.callTool('list_commits', { owner, repo });
+        const result = await githubAgent.callTool('list_commits', { owner, repo });
         const text = extractText(result);
         const data = parseJSON<Record<string, unknown>[]>(text, []);
         const commits: GitCommit[] = data.map((c) => ({
@@ -117,7 +117,7 @@ export function useGit() {
 
   const getFileContents = useCallback(
     async (owner: string, repo: string, path: string): Promise<string> => {
-      const result = await githubMCP.callTool('get_file_contents', { owner, repo, path });
+      const result = await githubAgent.callTool('get_file_contents', { owner, repo, path });
       return extractText(result);
     },
     [],
@@ -132,7 +132,7 @@ export function useGit() {
       head: string,
       base: string,
     ): Promise<string> => {
-      const result = await githubMCP.callTool('create_pull_request', {
+      const result = await githubAgent.callTool('create_pull_request', {
         owner,
         repo,
         title,
@@ -149,7 +149,7 @@ export function useGit() {
     async (owner: string, repo: string) => {
       setLoading(true);
       try {
-        const result = await githubMCP.callTool('list_pull_requests', { owner, repo });
+        const result = await githubAgent.callTool('list_pull_requests', { owner, repo });
         const text = extractText(result);
         const data = parseJSON<Record<string, unknown>[]>(text, []);
         const prs: PullRequest[] = data.map((p) => ({

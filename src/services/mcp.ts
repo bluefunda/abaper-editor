@@ -5,7 +5,10 @@ import { useAIStore } from '../stores/aiStore';
 let nextId = 1;
 
 function authHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json, text/event-stream',
+  };
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const realm = getRealm();
@@ -77,11 +80,27 @@ export class StreamableHTTPClient {
       this.sessionId = sid;
     }
 
-    const response: MCPResponse = await res.json();
+    const response = await this.parseResponse(res);
     if (response.error) {
       throw new Error(response.error.message);
     }
     return response.result;
+  }
+
+  /** Parse response body — handles both application/json and text/event-stream (SSE). */
+  private async parseResponse(res: Response): Promise<MCPResponse> {
+    const ct = res.headers.get('Content-Type') ?? '';
+    if (ct.includes('text/event-stream')) {
+      const text = await res.text();
+      // SSE format: "event: message\ndata: {json}\n\n"
+      for (const line of text.split('\n')) {
+        if (line.startsWith('data: ')) {
+          return JSON.parse(line.slice(6));
+        }
+      }
+      throw new Error('No data in SSE response');
+    }
+    return res.json();
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<MCPToolCallResult> {
@@ -117,24 +136,24 @@ export class StreamableHTTPClient {
 
 const MCP_BASE = import.meta.env.VITE_API_BASE_URL as string || '';
 
-export const abaperMCP = new StreamableHTTPClient(`${MCP_BASE}/ai/mcp`);
-export const githubMCP = new StreamableHTTPClient(`${MCP_BASE}/ai/mcp/github`);
+export const abaperAgent = new StreamableHTTPClient(`${MCP_BASE}/ai/agent`);
+export const githubAgent = new StreamableHTTPClient(`${MCP_BASE}/ai/agent/github`);
 
-export async function initMCP(): Promise<void> {
+export async function initAgent(): Promise<void> {
   try {
-    await abaperMCP.connect();
+    await abaperAgent.connect();
     useAIStore.getState().setMcpConnected(true);
 
     // Fetch available tools
     try {
-      const tools = await abaperMCP.listTools();
+      const tools = await abaperAgent.listTools();
       useAIStore.getState().setMcpTools(tools);
-      console.log(`MCP: ${tools.length} tools available`);
+      console.log(`Agent: ${tools.length} tools available`);
     } catch (err) {
-      console.warn('Failed to list MCP tools:', err);
+      console.warn('Failed to list agent tools:', err);
     }
   } catch (err) {
-    console.warn('Failed to connect to abaper-mcp:', err);
+    console.warn('Failed to connect to agent:', err);
     useAIStore.getState().setMcpConnected(false);
   }
 }

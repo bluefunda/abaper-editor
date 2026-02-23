@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { abaperMCP, extractText, extractJSON } from '../services/mcp';
+import { abaperAgent, extractText, extractJSON } from '../services/mcp';
 import { streamChat } from '../services/cai';
 import { useAIStore } from '../stores/aiStore';
 import type { ReviewFinding, S4RemediationResult, S4RemediationIssue } from '../types/mcp';
@@ -46,7 +46,7 @@ export function useAIAssistant() {
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Review ${objectType} ${objectName}` });
       try {
-        const result = await abaperMCP.callTool('analyze-s4-remediation', {
+        const result = await abaperAgent.callTool('analyze-s4-remediation', {
           object_type: objectType,
           object_name: objectName,
         });
@@ -88,7 +88,7 @@ export function useAIAssistant() {
       setAnalyzing(true);
       addMessage({ role: 'user', content: `S/4HANA remediation check for ${objectType} ${objectName}` });
       try {
-        const result = await abaperMCP.callTool('analyze-s4-remediation', {
+        const result = await abaperAgent.callTool('analyze-s4-remediation', {
           object_type: objectType,
           object_name: objectName,
         });
@@ -154,7 +154,7 @@ export function useAIAssistant() {
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Run unit tests for ${objectType} ${objectName}` });
       try {
-        const result = await abaperMCP.callTool('run-unit-tests', {
+        const result = await abaperAgent.callTool('run-unit-tests', {
           object_type: objectType,
           object_name: objectName,
         });
@@ -204,7 +204,7 @@ export function useAIAssistant() {
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Optimize ${objectType} ${objectName}` });
       try {
-        const result = await abaperMCP.callTool('analyze-s4-remediation', {
+        const result = await abaperAgent.callTool('analyze-s4-remediation', {
           object_type: objectType,
           object_name: objectName,
         });
@@ -235,7 +235,7 @@ export function useAIAssistant() {
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Fix error on line ${line}: ${errorMessage}` });
       try {
-        const result = await abaperMCP.callTool('analyze-s4-remediation', {
+        const result = await abaperAgent.callTool('analyze-s4-remediation', {
           object_type: objectType,
           object_name: objectName,
         });
