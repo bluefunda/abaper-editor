@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/bluefunda/abaper-editor/compare/v1.0.0...v1.0.1) (2026-02-23)
+
+
+### Bug Fixes
+
+* handle SSE responses, rename /ai/mcp to /ai/agent ([#10](https://github.com/bluefunda/abaper-editor/issues/10)) ([86b8254](https://github.com/bluefunda/abaper-editor/commit/86b8254f5452e63b079db2fc082d14e21ef2a5e1))
+
 ## 1.0.0 (2026-02-23)
 
 
