@@ -26,7 +26,7 @@ import { useSAPConnection } from './hooks/useSAPConnection';
 import { useAIAssistant } from './hooks/useAIAssistant';
 import * as monaco from 'monaco-editor';
 import { saveObject, activateObject, syntaxCheck, getObject, formatCode } from './services/api';
-import { initMCP } from './services/mcp';
+import { initAgent } from './services/mcp';
 import { normalizeObjectType } from './stores/editorStore';
 import type { DiagnosticItem } from './types/editor';
 
@@ -51,9 +51,9 @@ export default function App() {
 
   const { reviewCode, analyzeS4, explainCode, runTests, optimizeCode, fixError, sendPrompt } = useAIAssistant();
 
-  // Initialize MCP connection
+  // Initialize agent connection
   useEffect(() => {
-    initMCP();
+    initAgent();
   }, []);
 
   const handleCursorChange = useCallback((line: number, column: number) => {

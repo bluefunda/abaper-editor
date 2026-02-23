@@ -50,20 +50,20 @@ export default defineConfig({
         secure: !isLocal && !noAuth,
         rewrite: isLocal && !noAuth ? (p) => `/abaper${p}` : undefined,
       },
-      // AI routes: MCP + LLM chat streaming
-      // In LOCAL mode: /ai/mcp/* → abaper-mcp (8015), /ai/chats/* → cai-llm-router (8081)
+      // AI routes: Agent + LLM chat streaming
+      // In LOCAL mode: /ai/agent/* → abaper-mcp (8015), /ai/chats/* → cai-llm-router (8081)
       // In production: everything → abaper.bluefunda.com/ai/* → abaper-gw → abaper-bff
-      '/ai/mcp/github': {
+      '/ai/agent/github': {
         target: isLocal || noAuth ? 'http://localhost:8020' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
         secure: !isLocal && !noAuth,
-        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/ai\/mcp\/github/, '') : undefined,
+        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/ai\/agent\/github/, '') : undefined,
       },
-      '/ai/mcp': {
+      '/ai/agent': {
         target: isLocal || noAuth ? 'http://localhost:8015' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
         secure: !isLocal && !noAuth,
-        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/ai\/mcp/, '') : undefined,
+        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/ai\/agent/, '') : undefined,
         configure: (proxy) => {
           proxy.on('proxyRes', (proxyRes) => {
             if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
