@@ -13,38 +13,37 @@ ABAPer Editor is a single-page application (SPA) that provides a browser-based A
 │  └── Zustand stores (editor, AI, settings state)    │
 └─────────────┬───────────────────────┬───────────────┘
               │                       │
-     /abaper/* REST              /ai/* SSE
+     /abaper/* REST              /ai/* Streaming
               │                       │
               ▼                       ▼
-    ┌──────────────┐        ┌──────────────┐
-    │  abaper-gw   │        │    ai-gw     │
-    │ KrakenD:8083 │        │ KrakenD:8081 │
-    │  JWT + CORS  │        │  JWT + CORS  │
-    └──────┬───────┘        └──────┬───────┘
-           │                       │
-    ┌──────┴───────┐        ┌──────┴───────┐
-    │  abaper-ts   │        │   cai-bff    │
-    │ Express:8087 │        │   (Go/NATS)  │
-    │  ADT proxy   │        └──────┬───────┘
-    └──────┬───────┘               │
-           │                ┌──────┴────────┐
-           ▼                │ cai-llm-router│
-    ┌──────────────┐        │  (Temporal)   │
-    │  SAP System  │        └──────┬────────┘
-    │   (ADT API)  │               │
-    └──────────────┘        ┌──────┴────────┐
-                            │  abaper-mcp   │
-                            │  (MCP tools)  │
-                            └──────┬────────┘
-                                   │
-                            ┌──────┴────────┐
-                            │  abaper-ts    │
-                            │  (ADT proxy)  │
-                            └──────┬────────┘
-                                   │
-                            ┌──────┴────────┐
-                            │  SAP System   │
-                            └───────────────┘
+        ┌──────────────────────────────────┐
+        │          abaper-gw               │
+        │        KrakenD :8083             │
+        │        JWT + CORS                │
+        └──────┬───────────────────┬───────┘
+               │                   │
+        ┌──────┴───────┐    ┌──────┴───────┐
+        │  abaper-ts   │    │  abaper-bff  │
+        │ Express:8087 │    │   Go :8084   │
+        │  ADT proxy   │    │  HTTP proxy  │
+        └──────┬───────┘    └──┬────────┬──┘
+               │               │        │
+               ▼        ┌──────┘        └──────┐
+        ┌──────────┐    │                      │
+        │   SAP    │    ▼                      ▼
+        │ (ADT API)│  ┌──────────────┐  ┌──────────────┐
+        └──────────┘  │ abaper-mcp   │  │cai-llm-router│
+                      │ (MCP tools)  │  │  (Temporal)  │
+                      └──────┬───────┘  └──────────────┘
+                             │
+                      ┌──────┴───────┐
+                      │  abaper-ts   │
+                      │  (ADT proxy) │
+                      └──────┬───────┘
+                             │
+                      ┌──────┴───────┐
+                      │  SAP System  │
+                      └──────────────┘
 ```
 
 ## Two Request Paths
@@ -61,19 +60,21 @@ Editor → abaper-gw → abaper-ts → SAP ADT
 - **abaper-ts** translates JSON REST to SAP ADT XML/HTTP calls
 - Results return synchronously as JSON
 
-### 2. AI-Assisted Operations (SSE Streaming)
+### 2. AI-Assisted Operations (Streaming)
 
-Chat messages in the AI panel go through the CAI (Convo AI) path:
+Chat messages and MCP tool calls in the AI panel go through the BFF:
 
 ```
-Editor → ai-gw → cai-bff → cai-llm-router → LLM + abaper-mcp → abaper-ts → SAP
+Editor → abaper-gw → abaper-bff → abaper-mcp / cai-llm-router
 ```
 
-- **ai-gw** validates JWT, routes to CAI backend
-- **cai-bff** bridges HTTP to NATS messaging
+- **abaper-gw** validates JWT, routes `/ai/*` to abaper-bff
+- **abaper-bff** is a thin HTTP reverse proxy that fans out to backends:
+  - `/ai/agent/*` → **abaper-mcp** (MCP tools via Streamable HTTP)
+  - `/ai/chats/*` → **cai-llm-router** (LLM orchestration)
 - **cai-llm-router** orchestrates LLM calls with MCP tool execution
 - **abaper-mcp** exposes ABAP operations as MCP tools the LLM can invoke
-- Responses stream back as Server-Sent Events (SSE)
+- MCP uses Streamable HTTP transport (not legacy SSE)
 
 ## Frontend Architecture
 
@@ -115,7 +116,40 @@ Editor → ai-gw → cai-bff → cai-llm-router → LLM + abaper-mcp → abaper-
 1. User types a message in the AI panel
 2. `useAIAssistant.sendPrompt()` calls `cai.streamChat()`
 3. SSE connection opens to `/ai/chats/{chatId}` with `mcpServerName: 'abaper-mcp'`
-4. cai-llm-router routes to the `abaper` agent (model + MCP tools)
-5. LLM processes the request, calling MCP tools as needed (e.g., `create-class`, `activate-object`)
-6. Streaming chunks render progressively with markdown formatting
-7. Code blocks get syntax highlighting via react-syntax-highlighter
+4. cai-llm-router resolves the `abaper` agent (policy + active LLM profile)
+5. LLM processes the request, calling MCP tools as needed (e.g., `create-and-activate`)
+6. Structured SSE events stream back: `stream_tool_execution`, `stream_artifact`
+7. Frontend renders tool execution log, artifact badges, and markdown response
+
+## Agent Policy & Profiles
+
+### Policy Resolver (agents.yaml)
+
+The `abaper` agent config defines: model, max_iterations, timeout, MCP servers, tool filtering, system prompt, and retry behavior. Routing rules match incoming requests to agents by attributes (agent_name, has_mcp, model, prompt_length).
+
+### LLM Profiles (NATS KV)
+
+Profiles provide hot-reloadable overrides for the abaper agent without container restarts:
+
+```
+NATS KV bucket: "llm-profiles"
+├── _active              → "abaper_default"     (which profile to use)
+├── abaper_default       → YAML profile         (production prompt)
+└── abaper_experimental  → YAML profile         (A/B testing)
+```
+
+Each profile can override: system_prompt, model, constraints (max_retries, repair_mode), and response_format. Per-environment overrides (dev/prd) are applied on load. `PROFILE_ENV` env var controls which overrides apply (default: `prd`).
+
+On first run, the KV bucket is auto-created empty. The builtin default has no system prompt, so `agents.yaml` / `prompts/abaper.md` stays in effect until a profile is explicitly seeded.
+
+## Structured SSE Events
+
+During agent mode (multi-step tool execution), the backend emits structured events alongside the standard stream chunks:
+
+| Event | Purpose | Frontend |
+|-------|---------|----------|
+| `stream_tool_execution` | Tool name, status, duration, result summary | Collapsible tool execution log |
+| `stream_artifact` | Object name, type, action (created/activated/failed) | Color-coded artifact badges |
+| `stream_progress` | Tools being executed, iteration number | Progress indicator |
+
+These events are only emitted when `SuppressChunks=true` (agent mode), so non-MCP chat requests are unaffected.

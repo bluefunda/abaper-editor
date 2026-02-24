@@ -1,0 +1,16 @@
+# Vite dev Dockerfile for abaper-editor frontend (optional, profile: frontend)
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+ENV CHOKIDAR_USEPOLLING=true
+ENV NODE_OPTIONS=--max-old-space-size=4096
+ENV LOCAL=1
+
+EXPOSE 5173
+CMD ["npx", "vite", "--host", "0.0.0.0"]

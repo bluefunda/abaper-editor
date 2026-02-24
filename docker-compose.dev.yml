@@ -1,18 +1,45 @@
-# Local development — all backends + gateway + MCP in Docker, frontend runs natively
+# Local development — all backends + gateway + BFF + MCP in Docker
 #
 # Usage:
-#   cp .env.template .env.dev                        # fill in credentials
-#   docker compose -f docker-compose.dev.yml up      # all services
-#   LOCAL_GW=1 npm run dev                           # frontend with HMR
+#   cp .env.template .env.dev          # fill in credentials
+#   make up                            # start all backend services
+#   make dev                           # frontend with HMR (recommended)
+#   make dev-docker                    # frontend in Docker (alternative)
+#
+# Hot reload:
+#   Go services  → air watches bind-mounted source
+#   abaper-ts    → tsx watch on bind-mounted src/
+#   Frontend     → native Vite HMR (LOCAL=1 npm run dev)
 
 services:
-  # TypeScript backend — SAP ADT operations (via abap-adt-api)
+  # ──────────────────────────────────────────────
+  # Layer 0: no dependencies
+  # ──────────────────────────────────────────────
+
+  nats:
+    image: nats:2.10-alpine
+    command: "-js -m 8222"
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 3s
+
   abaper-ts:
     build:
-      context: ../../Downloads/src/abaper-ts
+      context: ../abaper-ts
+      dockerfile: ../abaper-editor/dev/Dockerfile.dev.node
     ports:
       - "8085:8080"
     env_file: .env.dev
+    volumes:
+      - ../abaper-ts/src:/app/src
+    restart: on-failure
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 10s
@@ -20,49 +47,47 @@ services:
       retries: 3
       start_period: 10s
 
-  # MCP server — AI tool interface, calls abaper-ts for ADT
-  abaper-mcp:
+  github-mcp:
     build:
-      context: ../../Downloads/src/abaper-mcp
-      args:
-        GH_PAT: ${GH_PAT:-}
+      context: ./mcp-servers
+      dockerfile_inline: |
+        FROM ghcr.io/github/github-mcp-server:latest AS mcp
+        FROM node:20-alpine
+        RUN npm install -g supergateway
+        COPY --from=mcp /server/github-mcp-server /usr/local/bin/github-mcp-server
+    container_name: github-mcp
+    command: >
+      supergateway
+      --stdio "/usr/local/bin/github-mcp-server stdio --toolsets=all"
+      --port 8020
+      --outputTransport streamableHttp
+    env_file: .env.dev
     ports:
-      - "8015:8015"
-    environment:
-      ABAPER_MODE: sse
-      ABAPER_TS_URL: http://abaper-ts:8080
-      ABAPER_HTTP_PORT: "8015"
-      LOG_LEVEL: info
-      LOG_FORMAT: console
-    depends_on:
-      abaper-ts:
-        condition: service_healthy
+      - "8020:8020"
+    restart: on-failure
+    mem_limit: 256m
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8015/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8020/health"]
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 15s
 
-  # Go backend — GitHub API proxy (OAuth, repos, branches, files)
   abaper-go:
     build:
-      context: ../../Downloads/src/abaper
-      dockerfile_inline: |
-        FROM golang:1.25-alpine AS builder
-        WORKDIR /app
-        COPY go.mod go.sum ./
-        RUN go mod download
-        COPY . .
-        RUN go build -o abaper .
-        FROM alpine:latest
-        RUN apk --no-cache add ca-certificates
-        WORKDIR /app
-        COPY --from=builder /app/abaper .
-        CMD ["./abaper", "server", "-p", "8086"]
+      context: ../abaper
+      dockerfile: ../abaper-editor/dev/Dockerfile.dev.go
+      args:
+        GH_PAT: ${GH_PAT:-}
+        BUILD_CMD: "go build -o ./tmp/main ."
+        BIN_ARGS: "server -p 8086"
     ports:
       - "8086:8086"
     env_file: .env.dev
+    volumes:
+      - ../abaper:/app
+      - go-mod-cache:/root/go/pkg/mod
+    restart: on-failure
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8086/health"]
       interval: 10s
@@ -70,21 +95,165 @@ services:
       retries: 3
       start_period: 10s
 
-  gateway:
+  # ──────────────────────────────────────────────
+  # Layer 1: health-gated on Layer 0
+  # ──────────────────────────────────────────────
+
+  abaper-mcp:
     build:
-      context: ../../src/abaper-gw
+      context: ../abaper-mcp
+      dockerfile: ../abaper-editor/dev/Dockerfile.dev.go
+      args:
+        GH_PAT: ${GH_PAT:-}
+        BUILD_CMD: "go build -o ./tmp/main ."
+    ports:
+      - "8015:8015"
+    env_file: .env.dev
+    volumes:
+      - ../abaper-mcp:/app
+      - go-mod-cache:/root/go/pkg/mod
+    depends_on:
+      abaper-ts:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8015/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  cai-bff:
+    build:
+      context: ../cai-bff
+      dockerfile: ../abaper-editor/dev/Dockerfile.dev.go
+      args:
+        GH_PAT: ${GH_PAT:-}
+        BUILD_CMD: "go build -o ./tmp/main ./cmd/server"
+        BIN_ARGS: "-config /config.yaml -dev"
+    ports:
+      - "8081:8080"
+    env_file: .env.dev
+    volumes:
+      - ../cai-bff:/app
+      - go-mod-cache:/root/go/pkg/mod
+      - ./config/cai-bff-compose.yaml:/config.yaml:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ──────────────────────────────────────────────
+  # Layer 2: health-gated on Layer 1
+  # ──────────────────────────────────────────────
+
+  cai-llm-router:
+    build:
+      context: ../cai-llm-router
+      dockerfile: ../abaper-editor/dev/Dockerfile.dev.go
+      args:
+        GH_PAT: ${GH_PAT:-}
+        BUILD_CMD: "go build -o ./tmp/main ./cmd/server"
+    env_file: .env.dev
+    volumes:
+      - ../cai-llm-router:/app
+      - go-mod-cache:/root/go/pkg/mod
+      - ../cai-llm-router/config:/config:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+      abaper-mcp:
+        condition: service_healthy
+    restart: on-failure
+
+  # ──────────────────────────────────────────────
+  # Layer 3: health-gated on Layer 1+2
+  # ──────────────────────────────────────────────
+
+  abaper-bff:
+    build:
+      context: ../abaper-bff
+      dockerfile: ../abaper-editor/dev/Dockerfile.dev.go
+      args:
+        GH_PAT: ${GH_PAT:-}
+        BUILD_CMD: "go build -o ./tmp/main ./cmd/server"
+        BIN_ARGS: "-dev"
+    ports:
+      - "8084:8080"
+      - "9092:9091"
+    env_file: .env.dev
+    volumes:
+      - ../abaper-bff:/app
+      - go-mod-cache:/root/go/pkg/mod
+    depends_on:
+      abaper-ts:
+        condition: service_healthy
+      abaper-mcp:
+        condition: service_healthy
+      cai-bff:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ──────────────────────────────────────────────
+  # Layer 4: gateway
+  # ──────────────────────────────────────────────
+
+  abaper-gw:
+    build:
+      context: ../abaper-gw
       args:
         ENV: compose
     ports:
       - "8083:8083"
-    environment:
-      DOMAIN: localhost
-      CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:5174"
+    env_file: .env.dev
     volumes:
       - ./config/krakend-compose.json:/etc/krakend/settings/compose/service.json:ro
     depends_on:
-      abaper-ts:
+      abaper-bff:
         condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8083/__health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ──────────────────────────────────────────────
+  # Layer 5: frontend (optional — profiles: [frontend])
+  # ──────────────────────────────────────────────
+
+  abaper-editor:
+    build:
+      context: .
+      dockerfile: dev/Dockerfile.dev.vite
+    ports:
+      - "5173:5173"
+    env_file: .env.dev
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+    depends_on:
+      abaper-bff:
+        condition: service_healthy
+    restart: on-failure
+    profiles:
+      - frontend
+
+volumes:
+  go-mod-cache:
 
 networks:
   default:

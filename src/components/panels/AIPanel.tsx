@@ -15,12 +15,16 @@ import {
   Circle,
   Copy,
   Check,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useAIStore } from '../../stores/aiStore';
+import type { ToolExecution, ArtifactEvent } from '../../stores/aiStore';
 import { Icon } from '../common/Icon';
 import type { ReviewFinding, S4RemediationIssue } from '../../types/mcp';
 
@@ -267,6 +271,66 @@ function S4IssueCard({ issue }: { issue: S4RemediationIssue }) {
   );
 }
 
+function ToolExecutionLog({ executions }: { executions: ToolExecution[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (executions.length === 0) return null;
+
+  const okCount = executions.filter((e) => e.status === 'ok').length;
+  const errCount = executions.length - okCount;
+  const totalMs = executions.reduce((sum, e) => sum + e.durationMs, 0);
+
+  return (
+    <div className="text-xs border border-panel-border rounded bg-white/5 my-1">
+      <button
+        className="flex items-center gap-1.5 w-full px-2 py-1 text-sidebar-fg/60 hover:text-sidebar-fg/80"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <Icon icon={expanded ? ChevronDown : ChevronRight} size={12} />
+        <span>
+          {executions.length} tool call{executions.length !== 1 ? 's' : ''}
+        </span>
+        <span className="text-green-400/80">{okCount} ok</span>
+        {errCount > 0 && <span className="text-red-400/80">{errCount} err</span>}
+        <span className="ml-auto text-sidebar-fg/40">{(totalMs / 1000).toFixed(1)}s</span>
+      </button>
+      {expanded && (
+        <div className="border-t border-panel-border px-2 py-1 space-y-0.5">
+          {executions.map((exec, i) => (
+            <div key={i} className="flex items-center gap-2 text-[11px]">
+              <span className={exec.status === 'ok' ? 'text-green-400' : 'text-red-400'}>
+                {exec.status === 'ok' ? '✓' : '✗'}
+              </span>
+              <span className="text-sidebar-fg/70 font-mono">{exec.toolName}</span>
+              <span className="text-sidebar-fg/40 ml-auto">{exec.durationMs}ms</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ArtifactBadges({ artifacts }: { artifacts: ArtifactEvent[] }) {
+  if (artifacts.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1 my-1">
+      {artifacts.map((a, i) => (
+        <span
+          key={i}
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono ${
+            a.success
+              ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+              : 'bg-red-500/10 text-red-400 border border-red-500/20'
+          }`}
+        >
+          {a.success ? '✓' : '✗'} {a.artifactName} {a.action.replace(/_/g, ' ')}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function AIPanel({
   onReview,
   onS4Check,
@@ -286,6 +350,8 @@ export function AIPanel({
   const cancelAnalysis = useAIStore((s) => s.cancelAnalysis);
   const mcpTools = useAIStore((s) => s.mcpTools);
   const mcpConnected = useAIStore((s) => s.mcpConnected);
+  const toolExecutions = useAIStore((s) => s.toolExecutions);
+  const artifacts = useAIStore((s) => s.artifacts);
   const selectedModel = useAIStore((s) => s.selectedModel);
   const setSelectedModel = useAIStore((s) => s.setSelectedModel);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -297,7 +363,7 @@ export function AIPanel({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, lastReviewResult, lastS4Result, isStreaming]);
+  }, [messages, lastReviewResult, lastS4Result, isStreaming, toolExecutions, artifacts]);
 
   const handleSend = useCallback(() => {
     const text = inputText.trim();
@@ -350,8 +416,8 @@ export function AIPanel({
         />
         <span className="text-sidebar-fg/60">
           {mcpConnected
-            ? `MCP: ${toolCount} tool${toolCount !== 1 ? 's' : ''}`
-            : 'MCP: Disconnected'}
+            ? `ABAPer agent: ${toolCount} tools`
+            : 'ABAPer agent: Offline'}
         </span>
         <div className="flex-1" />
         <select
@@ -360,10 +426,10 @@ export function AIPanel({
           onChange={(e) => setSelectedModel(e.target.value)}
           title="Select LLM model"
         >
+          <option value="groq">Groq</option>
           <option value="anthropic">Anthropic</option>
           <option value="openai">OpenAI</option>
           <option value="gemini">Gemini</option>
-          <option value="groq">Groq</option>
         </select>
         {(isAnalyzing || isStreaming) && (
           <button
@@ -410,17 +476,23 @@ export function AIPanel({
           );
         })}
 
-        {/* Streaming typing indicator when content is empty */}
-        {isStreaming && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && !messages[messages.length - 1]?.content && (
-          <div className="flex items-center gap-1.5 text-xs text-sidebar-fg/40 py-1">
-            <span className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-sidebar-fg/40 animate-bounce [animation-delay:0ms]" />
-              <span className="w-1 h-1 rounded-full bg-sidebar-fg/40 animate-bounce [animation-delay:150ms]" />
-              <span className="w-1 h-1 rounded-full bg-sidebar-fg/40 animate-bounce [animation-delay:300ms]" />
+        {/* Progress indicator for active operations */}
+        {(isStreaming || isAnalyzing) && (
+          <div className="flex items-center gap-2 text-xs text-sidebar-fg/50 py-1.5 px-1">
+            <Icon icon={Loader2} size={14} className="animate-spin text-accent/70" />
+            <span>
+              {isStreaming
+                ? messages[messages.length - 1]?.content
+                  ? 'Generating...'
+                  : 'Thinking...'
+                : 'Analyzing...'}
             </span>
-            Thinking...
           </div>
         )}
+
+        {/* Tool execution log and artifact badges */}
+        <ToolExecutionLog executions={toolExecutions} />
+        <ArtifactBadges artifacts={artifacts} />
 
         {/* Review findings inline */}
         {lastReviewResult && lastReviewResult.length > 0 && (

@@ -1,0 +1,87 @@
+keycloak:
+  realms:
+    individual:
+      base_url: "https://auth.bluefunda.com"
+    trm:
+      base_url: "https://auth.bluefunda.com"
+    wizzgeeks:
+      base_url: "https://auth.bluefunda.com"
+    simplistek:
+      base_url: "https://auth.bluefunda.com"
+
+server:
+  http_port: 8080
+  grpc_port: 9090
+
+metrics:
+  port: 9091
+
+gateway:
+  allow_path_based_realm: false
+
+nats:
+  enabled: true
+  url: "nats://nats:4222"
+  creds_file: "/dev/null"
+  realms:
+    individual: "individual"
+    trm: "individual"
+    wizzgeeks: "individual"
+    simplistek: "individual"
+
+proxy:
+  base: "ai"
+  default_timeout: 30s
+
+  apis:
+    - name: "getLLMModels"
+      type: "query"
+      description: "Get available LLM models for the user"
+      http:
+        path: "/api/v1/models"
+        method: "GET"
+
+    - name: "getChatIds"
+      type: "query"
+      description: "Get chat IDs for the user"
+      http:
+        path: "/api/v1/chats"
+        method: "GET"
+
+    - name: "getMessages"
+      type: "query"
+      description: "Get messages for a specific chat"
+      params: ["chatId"]
+      http:
+        path: "/api/v1/chats/{chatId}/messages"
+        method: "GET"
+      subject: "ai.{realm}.{userId}.query.getChatHistory.{chatId}"
+
+    - name: "chat"
+      type: "stream"
+      description: "Send message and receive streaming response"
+      params: ["chatId"]
+      http:
+        path: "/api/v1/chats/{chatId}"
+        method: "POST"
+        sse: true
+      subject: "ai.{realm}.{userId}.chat.{chatId}"
+      reply_subject: "ai.{realm}.{userId}.chat.{chatId}.response"
+
+    - name: "stopChat"
+      type: "publish"
+      description: "Stop an ongoing chat stream"
+      params: ["chatId"]
+      http:
+        path: "/api/v1/chats/{chatId}/stop"
+        method: "POST"
+      subject: "ai.{realm}.{userId}.chat.{chatId}.stop"
+
+    - name: "generateTitle"
+      type: "query"
+      description: "Generate a title for a chat based on initial prompt"
+      params: ["chatId"]
+      http:
+        path: "/api/v1/chats/{chatId}/title"
+        method: "POST"
+      subject: "ai.{realm}.{userId}.chat.title.generate.{chatId}"

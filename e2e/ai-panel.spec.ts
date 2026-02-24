@@ -20,10 +20,10 @@ async function openObject(page: import('@playwright/test').Page) {
 }
 
 test.describe('AI Panel', () => {
-  test('shows MCP status indicator', async ({ page }) => {
+  test('shows ABAPer agent status indicator', async ({ page }) => {
     await page.goto('/');
     await openRightPanel(page);
-    await expect(page.getByText(/MCP:/).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/ABAPer agent:/).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('shows quick action buttons with tooltips', async ({ page }) => {
