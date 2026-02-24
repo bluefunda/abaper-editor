@@ -6,3 +6,4 @@ dist/
 !.env.template
 tsconfig.tsbuildinfo
 test-results/
+.claude/

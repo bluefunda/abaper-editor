@@ -274,6 +274,7 @@ export function useAIAssistant() {
       const chatId = store.chatId || crypto.randomUUID();
       store.setChatId(chatId);
       store.resetStreamContent();
+      store.resetAgentState();
       store.setStreaming(true);
 
       const signal = store.getAbortSignal();
@@ -294,6 +295,7 @@ export function useAIAssistant() {
             chat_id: chatId,
             prompt,
             model: store.selectedModel,
+            agent_name: 'abaper',
             mcp_server_name: 'abaper-mcp',
             is_new_chat: isNew,
           },
@@ -301,13 +303,34 @@ export function useAIAssistant() {
           (event) => {
             const s = useAIStore.getState();
             if (event.type === 'stream_chunk' && event.content) {
-              s.appendStreamContent(event.content);
-              s.updateLastMessage(s.streamingContent + event.content);
+              s.processStreamChunk(event.content);
+            } else if (event.type === 'stream_progress') {
+              // Show tool execution progress while thinking is suppressed
+              const toolsStr = event.tools?.join(', ') || 'tools';
+              const step = event.iteration ? ` (step ${event.iteration})` : '';
+              s.updateLastMessage(`*Running ${toolsStr}${step}...*`);
+              s.resetStreamContent(); // reset so next chunk starts fresh
             } else if (event.type === 'stream_end') {
               if (event.full_content) {
                 s.updateLastMessage(event.full_content);
               }
               s.setStreaming(false);
+            } else if (event.type === 'stream_tool_execution') {
+              s.addToolExecution({
+                toolName: event.tool_name || '',
+                status: event.status || 'ok',
+                durationMs: event.duration_ms || 0,
+                resultSummary: event.result_summary || '',
+                iteration: event.iteration || 0,
+              });
+            } else if (event.type === 'stream_artifact') {
+              s.addArtifact({
+                artifactName: event.artifact_name || '',
+                artifactType: event.artifact_type || '',
+                action: event.action || '',
+                success: event.success ?? true,
+                message: event.message || '',
+              });
             } else if (event.type === 'error' || event.type === 'stream_error') {
               s.updateLastMessage(`Error: ${event.error || event.message || 'Unknown error'}`);
               s.setStreaming(false);

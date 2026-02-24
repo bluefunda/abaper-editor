@@ -27,6 +27,8 @@ export default defineConfig({
         secure: !isLocal && !noAuth,
       },
       // SAP/ADT API routes
+      // LOCAL: through KrakenD (8083) — user authenticates via Keycloak, JWT is validated by gateway
+      // NOAUTH: bypass everything, go directly to abaper-ts (8085)
       '/api': {
         target: noAuth ? 'http://localhost:8085' : isLocal ? 'http://localhost:8083' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
@@ -51,7 +53,7 @@ export default defineConfig({
         rewrite: isLocal && !noAuth ? (p) => `/abaper${p}` : undefined,
       },
       // AI routes: Agent + LLM chat streaming
-      // In LOCAL mode: /ai/agent/* → abaper-mcp (8015), /ai/chats/* → cai-llm-router (8081)
+      // In LOCAL mode: /ai/agent + /ai/chats/* → BFF (8084) → abaper-mcp / cai-llm-router
       // In production: everything → abaper.bluefunda.com/ai/* → abaper-gw → abaper-bff
       '/ai/agent/github': {
         target: isLocal || noAuth ? 'http://localhost:8020' : 'https://abaper.bluefunda.com',
@@ -59,11 +61,13 @@ export default defineConfig({
         secure: !isLocal && !noAuth,
         rewrite: isLocal || noAuth ? (p) => p.replace(/^\/ai\/agent\/github/, '') : undefined,
       },
+      // In LOCAL mode: /ai/agent and /ai/chats/* route through BFF (8084), no rewrite needed
+      // BFF handles routing to abaper-mcp and cai-llm-router internally
       '/ai/agent': {
-        target: isLocal || noAuth ? 'http://localhost:8015' : 'https://abaper.bluefunda.com',
+        target: isLocal ? 'http://localhost:8084' : noAuth ? 'http://localhost:8015' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
         secure: !isLocal && !noAuth,
-        rewrite: isLocal || noAuth ? (p) => p.replace(/^\/ai\/agent/, '') : undefined,
+        rewrite: noAuth ? (p) => p.replace(/^\/ai\/agent/, '') : undefined,
         configure: (proxy) => {
           proxy.on('proxyRes', (proxyRes) => {
             if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
@@ -74,12 +78,9 @@ export default defineConfig({
         },
       },
       '/ai': {
-        target: isLocal ? 'http://localhost:8081' : 'https://abaper.bluefunda.com',
+        target: isLocal ? 'http://localhost:8084' : 'https://abaper.bluefunda.com',
         changeOrigin: true,
         secure: !isLocal,
-        rewrite: isLocal
-          ? (p: string) => p.replace(/^\/ai/, '')
-          : undefined,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             console.log(`[ai-proxy] ${req.method} ${req.url} → ${proxyReq.path}`);

@@ -1,4 +1,4 @@
-import { getToken, getRealm } from './auth';
+import { getToken, getRealm, keycloak } from './auth';
 
 // --- Types ---
 
@@ -6,17 +6,30 @@ export interface ChatRequest {
   chat_id: string;
   prompt: string;
   model: string;
+  agent_name: string;
   mcp_server_name: string;
   is_new_chat: boolean;
 }
 
 export interface ChatEvent {
-  type: 'stream_start' | 'stream_chunk' | 'stream_end' | 'stream_heartbeat' | 'stream_progress' | 'stream_stopped' | 'error' | 'stream_error';
+  type: 'stream_start' | 'stream_chunk' | 'stream_end' | 'stream_heartbeat' | 'stream_progress' | 'stream_stopped' | 'error' | 'stream_error' | 'stream_tool_execution' | 'stream_artifact';
   content?: string;
   full_content?: string;
   error?: string;
   message?: string;
   session_id?: string;
+  tools?: string[];
+  iteration?: number;
+  // stream_tool_execution fields
+  tool_name?: string;
+  status?: string;
+  duration_ms?: number;
+  result_summary?: string;
+  // stream_artifact fields
+  artifact_name?: string;
+  artifact_type?: string;
+  action?: string;
+  success?: boolean;
 }
 
 // --- SSE Streaming ---
@@ -39,6 +52,7 @@ export async function streamChat(
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (realm) headers['X-Realm'] = realm;
+  if (keycloak?.subject) headers['x-user'] = keycloak.subject;
 
   const response = await fetch(`/ai/chats/${req.chat_id}`, {
     method: 'POST',
@@ -46,6 +60,7 @@ export async function streamChat(
     body: JSON.stringify({
       prompt: req.prompt,
       model: req.model,
+      agentName: req.agent_name,
       mcpServerName: req.mcp_server_name,
       isNewChat: req.is_new_chat,
     }),

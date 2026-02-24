@@ -1,6 +1,22 @@
 import { create } from 'zustand';
 import type { AIMessage, ReviewFinding, S4RemediationResult, MCPToolInfo } from '../types/mcp';
 
+export interface ToolExecution {
+  toolName: string;
+  status: string;
+  durationMs: number;
+  resultSummary: string;
+  iteration: number;
+}
+
+export interface ArtifactEvent {
+  artifactName: string;
+  artifactType: string;
+  action: string;
+  success: boolean;
+  message: string;
+}
+
 interface AIState {
   messages: AIMessage[];
   isAnalyzing: boolean;
@@ -13,6 +29,8 @@ interface AIState {
   isStreaming: boolean;
   streamingContent: string;
   selectedModel: string;
+  toolExecutions: ToolExecution[];
+  artifacts: ArtifactEvent[];
 
   addMessage: (message: Omit<AIMessage, 'id' | 'timestamp'>) => string;
   clearMessages: () => void;
@@ -29,6 +47,10 @@ interface AIState {
   appendStreamContent: (chunk: string) => void;
   resetStreamContent: () => void;
   updateLastMessage: (content: string) => void;
+  processStreamChunk: (chunk: string) => void;
+  addToolExecution: (exec: ToolExecution) => void;
+  addArtifact: (artifact: ArtifactEvent) => void;
+  resetAgentState: () => void;
 }
 
 export const useAIStore = create<AIState>()((set, get) => ({
@@ -42,7 +64,9 @@ export const useAIStore = create<AIState>()((set, get) => ({
   chatId: null,
   isStreaming: false,
   streamingContent: '',
-  selectedModel: 'anthropic',
+  selectedModel: 'groq',
+  toolExecutions: [],
+  artifacts: [],
 
   addMessage: (msg) => {
     const id = crypto.randomUUID();
@@ -108,4 +132,24 @@ export const useAIStore = create<AIState>()((set, get) => ({
       }
       return { messages: msgs };
     }),
+
+  processStreamChunk: (chunk) =>
+    set((s) => {
+      const newContent = s.streamingContent + chunk;
+      const msgs = [...s.messages];
+      if (msgs.length > 0) {
+        const last = msgs[msgs.length - 1]!;
+        msgs[msgs.length - 1] = { ...last, content: newContent };
+      }
+      return { streamingContent: newContent, messages: msgs };
+    }),
+
+  addToolExecution: (exec) =>
+    set((s) => ({ toolExecutions: [...s.toolExecutions, exec] })),
+
+  addArtifact: (artifact) =>
+    set((s) => ({ artifacts: [...s.artifacts, artifact] })),
+
+  resetAgentState: () =>
+    set({ toolExecutions: [], artifacts: [] }),
 }));

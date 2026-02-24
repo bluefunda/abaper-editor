@@ -1,0 +1,37 @@
+# Debug overlay — use with: make debug
+# Adds verbose logging, pprof, and Node inspector
+#
+# Usage: docker compose -f docker-compose.dev.yml -f docker-compose.debug.yml up --build -d
+
+services:
+  abaper-mcp:
+    environment:
+      LOG_LEVEL: debug
+      GODEBUG: gctrace=1
+
+  abaper-go:
+    environment:
+      LOG_LEVEL: debug
+      GODEBUG: gctrace=1
+
+  abaper-bff:
+    environment:
+      ABAPER_BFF_LOG_LEVEL: debug
+      GODEBUG: gctrace=1
+    ports:
+      - "6060:6060"
+
+  cai-bff:
+    environment:
+      LOG_LEVEL: debug
+      GODEBUG: gctrace=1
+
+  cai-llm-router:
+    environment:
+      LOG_LEVEL: debug
+      GODEBUG: gctrace=1
+
+  abaper-ts:
+    command: ["npx", "tsx", "watch", "--inspect=0.0.0.0:9229", "src/index.ts"]
+    ports:
+      - "9229:9229"
