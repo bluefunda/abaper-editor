@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/bluefunda/abaper-editor/compare/v1.0.1...v1.1.0) (2026-02-24)
+
+
+### Features
+
+* SSE event handling, dev infrastructure, agent docs ([#12](https://github.com/bluefunda/abaper-editor/issues/12)) ([2178e3b](https://github.com/bluefunda/abaper-editor/commit/2178e3b8a2b89c41623e7e5262e2f6316e8ee1aa))
+
 ## [1.0.1](https://github.com/bluefunda/abaper-editor/compare/v1.0.0...v1.0.1) (2026-02-23)
 
 
