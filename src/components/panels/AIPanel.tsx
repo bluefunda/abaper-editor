@@ -352,8 +352,6 @@ export function AIPanel({
   const mcpConnected = useAIStore((s) => s.mcpConnected);
   const toolExecutions = useAIStore((s) => s.toolExecutions);
   const artifacts = useAIStore((s) => s.artifacts);
-  const selectedModel = useAIStore((s) => s.selectedModel);
-  const setSelectedModel = useAIStore((s) => s.setSelectedModel);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [inputText, setInputText] = useState('');
@@ -420,17 +418,9 @@ export function AIPanel({
             : 'ABAPer agent: Offline'}
         </span>
         <div className="flex-1" />
-        <select
-          className="bg-transparent border border-panel-border rounded px-1 py-0.5 text-[11px] text-sidebar-fg/70 focus:outline-none focus:border-accent/50 cursor-pointer"
-          value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value)}
-          title="Select LLM model"
-        >
-          <option value="groq">Groq</option>
-          <option value="anthropic">Anthropic</option>
-          <option value="openai">OpenAI</option>
-          <option value="gemini">Gemini</option>
-        </select>
+        <span className="text-[11px] text-sidebar-fg/50">
+          gpt-oss-120b
+        </span>
         {(isAnalyzing || isStreaming) && (
           <button
             className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] bg-red-500/20 text-red-400 hover:bg-red-500/30"
