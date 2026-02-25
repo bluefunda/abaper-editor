@@ -352,8 +352,6 @@ export function AIPanel({
   const mcpConnected = useAIStore((s) => s.mcpConnected);
   const toolExecutions = useAIStore((s) => s.toolExecutions);
   const artifacts = useAIStore((s) => s.artifacts);
-  const selectedModel = useAIStore((s) => s.selectedModel);
-  const setSelectedModel = useAIStore((s) => s.setSelectedModel);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [inputText, setInputText] = useState('');
