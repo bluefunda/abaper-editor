@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/bluefunda/abaper-editor/compare/v1.1.0...v1.2.0) (2026-02-25)
+
+
+### Features
+
+* SSE events, dev infrastructure, and LLM config ([#15](https://github.com/bluefunda/abaper-editor/issues/15)) ([379a808](https://github.com/bluefunda/abaper-editor/commit/379a808f8aa940049a6023404f798c79da47fc18))
+
 ## [1.1.0](https://github.com/bluefunda/abaper-editor/compare/v1.0.1...v1.1.0) (2026-02-24)
 
 
