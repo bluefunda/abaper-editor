@@ -1,6 +1,6 @@
 # ABAPer Agent — Roadmap Status
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 
 ## Completed
 
@@ -18,6 +18,14 @@ Last updated: 2026-02-24
 |-------|------|---------------|
 | **Phase 2** | Temporal Orchestration | Users regularly issue multi-artifact prompts (5+ artifacts with dependencies). Phase 1's per-tool approach is insufficient for inter-artifact dependency chains. Need resume-on-crash for long-running workflows. |
 | **Phase 4** | Large Payload Strategy | NATS message rejections observed due to >1MB payloads. Currently theoretical — no rejections seen. |
+
+## RAG (Retrieval-Augmented Generation)
+
+| Tier | Name | Status | Gate Criteria |
+|------|------|--------|---------------|
+| **RAG-0** | Error Pattern Retrieval | **Next** | None — implement now |
+| **RAG-1** | Code Pattern Retrieval | Gated | RAG-0 proven useful. Agent still generates incorrect ABAP on first attempt. |
+| **RAG-2** | SAP System Knowledge (XPro) | Gated | RAG-1 proven useful. Agent fails on type resolution / API discovery. Daily sync via XPro → PostgreSQL + pgvector. |
 
 ## Phase Details
 
@@ -72,6 +80,25 @@ Last updated: 2026-02-24
 nats kv put llm-profiles abaper_default < profile.yaml
 nats kv put llm-profiles _active 'abaper_default'
 ```
+
+### RAG-0 — Error Pattern Retrieval
+
+**Problem**: When `create-and-activate` fails with activation errors, the LLM guesses fixes from scratch. Same errors repeat across sessions with no learning.
+
+**Solution**: NATS KV bucket `rag-error-patterns` stores error→fix pairs. Auto-populated after successful retries (tool fails → LLM fixes → tool succeeds). Retrieved before LLM retry — top matches injected as system message context.
+
+**Repo**: `cai-llm-router`
+
+**Files to create**:
+- `internal/rag/errors.go` — ErrorPatternStore wrapping NATS KV
+
+**Files to modify**:
+- `internal/handler/mcp_handler.go` — query/store error patterns in agentic loop
+- `internal/handler/chat.go` — add ragStore field
+- `cmd/server/main.go` — initialize ErrorPatternStore (same pattern as ProfileManager)
+- `config/agents.yaml` — add `retrieval.enabled: true`
+
+**Design doc**: [`PHASE-RAG.md`](PHASE-RAG.md)
 
 ### Phase 2 — Temporal Orchestration (Gated)
 
