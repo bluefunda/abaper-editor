@@ -285,17 +285,25 @@ export default function App() {
       const tab = useEditorStore.getState().getActiveTab();
       useSettingsStore.setState({ rightPanelVisible: true });
 
-      // Use selected text if available, otherwise full source
-      let source = tab?.model.getValue() ?? '';
+      // If the prompt already contains a fenced code block (user pasted code),
+      // use that as context instead of the active editor file
+      const hasInlineCode = /```[\s\S]*```/.test(text);
+
+      let source = '';
       let isSelection = false;
-      const editor = editorRef.current;
-      if (editor && tab) {
-        const selection = editor.getSelection();
-        if (selection && !selection.isEmpty()) {
-          const selectedText = editor.getModel()?.getValueInRange(selection) ?? '';
-          if (selectedText) {
-            source = selectedText;
-            isSelection = true;
+
+      if (!hasInlineCode) {
+        // Use selected text if available, otherwise full source
+        source = tab?.model.getValue() ?? '';
+        const editor = editorRef.current;
+        if (editor && tab) {
+          const selection = editor.getSelection();
+          if (selection && !selection.isEmpty()) {
+            const selectedText = editor.getModel()?.getValueInRange(selection) ?? '';
+            if (selectedText) {
+              source = selectedText;
+              isSelection = true;
+            }
           }
         }
       }
