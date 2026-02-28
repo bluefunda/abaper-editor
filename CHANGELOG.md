@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/bluefunda/abaper-editor/compare/v1.2.0...v1.3.0) (2026-02-28)
+
+
+### Features
+
+* AI panel paste detection and sidebar UX improvements ([#18](https://github.com/bluefunda/abaper-editor/issues/18)) ([cc51e82](https://github.com/bluefunda/abaper-editor/commit/cc51e829342180593f87996b177bf1e486833f6f))
+
 ## [1.2.0](https://github.com/bluefunda/abaper-editor/compare/v1.1.0...v1.2.0) (2026-02-25)
 
 
