@@ -57,6 +57,45 @@ const s4SeverityColor = {
   low: 'text-blue-400 border-blue-400/30',
 };
 
+// --- Paste detection: auto-wrap pasted code in fenced blocks ---
+
+const ABAP_KEYWORDS =
+  /\b(REPORT|PROGRAM|DATA|TYPES|CLASS|ENDCLASS|METHOD|ENDMETHOD|INTERFACE|ENDINTERFACE|FORM|ENDFORM|FUNCTION|ENDFUNCTION|SELECT|ENDSELECT|LOOP|ENDLOOP|IF|ENDIF|DO|ENDDO|WHILE|ENDWHILE|TRY|ENDTRY|CATCH|WRITE|CALL|PERFORM|RAISE|APPEND|READ|MODIFY|DELETE|INSERT|UPDATE|FIELD-SYMBOLS?|IMPORTING|EXPORTING|CHANGING|RETURNING|DEFINITION|IMPLEMENTATION|BEGIN\s+OF|END\s+OF)\b/i;
+
+function isCodeLine(line: string): boolean {
+  return ABAP_KEYWORDS.test(line) || /[.;{})]\s*$/.test(line.trim()) || /^\s{2,}\S/.test(line);
+}
+
+/** Split pasted text into { prose, code } if it contains a mix of natural language and code. */
+function splitProseAndCode(text: string): { prose: string; code: string } | null {
+  const trimmed = text.trim();
+  if (trimmed.startsWith('```')) return null; // already wrapped
+
+  const lines = trimmed.split('\n');
+
+  // Find first line that looks like code
+  const codeStart = lines.findIndex((l) => isCodeLine(l));
+  if (codeStart < 0) return null; // no code detected
+
+  // Check there's enough code content
+  const codeLines = lines.slice(codeStart);
+  const codeCount = codeLines.filter((l) => isCodeLine(l)).length;
+  if (codeCount < 1) return null;
+
+  const prose = lines.slice(0, codeStart).join('\n').trim();
+  const code = codeLines.join('\n').trimEnd();
+  return { prose, code };
+}
+
+function detectLanguage(text: string): string {
+  if (ABAP_KEYWORDS.test(text)) return 'abap';
+  if (/\b(SELECT|FROM|WHERE|JOIN|GROUP\s+BY|ORDER\s+BY|CREATE\s+TABLE|INSERT\s+INTO)\b/i.test(text)) return 'sql';
+  if (/\b(function|const|let|var|import|export|=>)\b/.test(text)) return 'typescript';
+  if (/\b(def |class |import |from |print\(|self\.)\b/.test(text)) return 'python';
+  if (/\b(func |package |fmt\.|:=)\b/.test(text)) return 'go';
+  return 'code';
+}
+
 // --- Copy button for code blocks ---
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -389,8 +428,36 @@ export function AIPanel({
     // Auto-resize textarea
     const el = e.target;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   }, []);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = e.clipboardData.getData('text/plain');
+    const split = splitProseAndCode(pasted);
+    if (!split) return; // no code detected, let default paste happen
+
+    e.preventDefault();
+    const lang = detectLanguage(split.code);
+    const codeBlock = `\`\`\`${lang}\n${split.code}\n\`\`\``;
+    const formatted = split.prose
+      ? `${split.prose}\n${codeBlock}\n`
+      : `${codeBlock}\n`;
+
+    const textarea = e.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = inputText.slice(0, start);
+    const after = inputText.slice(end);
+    const newText = before + formatted + after;
+    setInputText(newText);
+
+    requestAnimationFrame(() => {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+      const newPos = (before + formatted).length;
+      textarea.selectionStart = textarea.selectionEnd = newPos;
+    });
+  }, [inputText]);
 
   const actions = [
     { label: 'Format', icon: AlignLeft, action: onFormatCode, title: 'Format Code (Shift+Alt+F)' },
@@ -524,6 +591,7 @@ export function AIPanel({
           value={inputText}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           rows={1}
           disabled={isAnalyzing}
         />

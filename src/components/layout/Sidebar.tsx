@@ -87,23 +87,21 @@ export function Sidebar({ children }: SidebarProps) {
     onResize,
   });
 
-  if (!sidebarVisible) return null;
-
   return (
     <div className="flex h-full shrink-0">
-      {/* Icon rail */}
+      {/* Icon rail — always visible */}
       <div className="w-12 bg-sidebar-bg flex flex-col items-center pt-2 gap-1 border-r border-panel-border">
         {sidebarItems.map((item) => (
           <button
             key={item.id}
             className={`w-10 h-10 flex items-center justify-center rounded hover:bg-white/10 ${
-              sidebarPanel === item.id ? 'text-white border-l-2 border-accent' : 'text-sidebar-fg/60'
+              sidebarVisible && sidebarPanel === item.id ? 'text-white border-l-2 border-accent' : 'text-sidebar-fg/60'
             }`}
             onClick={() => {
-              if (sidebarPanel === item.id) {
-                toggleSidebar();
+              if (sidebarVisible && sidebarPanel === item.id) {
+                toggleSidebar(); // collapse panel
               } else {
-                setSidebarPanel(item.id);
+                setSidebarPanel(item.id); // opens panel + sets active tab
               }
             }}
             title={item.title}
@@ -131,21 +129,23 @@ export function Sidebar({ children }: SidebarProps) {
           <UserMenu />
         </div>
       </div>
-      {/* Panel area */}
-      <div
-        className="bg-sidebar-bg border-r border-panel-border flex flex-col overflow-hidden relative"
-        style={{ width: sidebarWidth }}
-      >
-        <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-fg/60">
-          {panelTitles[sidebarPanel]}
-        </div>
-        <div className="flex-1 overflow-auto">{children}</div>
-        {/* Resize handle */}
+      {/* Panel area — only visible when sidebar is open */}
+      {sidebarVisible && (
         <div
-          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-accent/50 active:bg-accent/70 transition-colors z-10"
-          onMouseDown={onMouseDown}
-        />
-      </div>
+          className="bg-sidebar-bg border-r border-panel-border flex flex-col overflow-hidden relative"
+          style={{ width: sidebarWidth }}
+        >
+          <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-fg/60">
+            {panelTitles[sidebarPanel]}
+          </div>
+          <div className="flex-1 overflow-auto">{children}</div>
+          {/* Resize handle */}
+          <div
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-accent/50 active:bg-accent/70 transition-colors z-10"
+            onMouseDown={onMouseDown}
+          />
+        </div>
+      )}
     </div>
   );
 }
