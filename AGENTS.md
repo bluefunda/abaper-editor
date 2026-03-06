@@ -236,6 +236,27 @@ Three modes controlled by environment variables:
 - Nginx serves SPA from `/usr/share/nginx/html`, uses `nginx.conf.template` with envsubst
 - Watchtower auto-deploys on the frontend node after push to main
 
+## Branch Naming
+
+Follow the org convention: `<type>/<short-description>`.
+
+| Type | Example |
+|---|---|
+| `feat/` | `feat/mcp-integration` |
+| `fix/` | `fix/mcp-streamable-http` |
+| `chore/` | `chore/update-gitignore` |
+| `docs/` | `docs/add-documentation` |
+
+## Pull Request Guidelines
+
+- PR title must use conventional commit format: `feat: ...`, `fix: ...`, `infra: ...`, etc.
+- Scoped titles are encouraged: `feat(editor): add inline diff view`.
+- The PR template is defined at org level (`bluefunda/.github` repo). Do not add a repo-level override unless diverging from the org standard.
+- Required sections: Summary, Type (checkbox), Test Plan.
+- Customer Impact is required for `feature`, `performance`, and `security` PRs.
+- Metrics and Marketing Notes are optional.
+- PRs target `main` branch.
+
 ## CI/CD Pipeline
 
 1. **PR**: `ci.yml` runs typecheck + build + Playwright E2E
