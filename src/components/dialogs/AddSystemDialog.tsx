@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSystemStore } from '../../stores/systemStore';
 import { testSystemConnectionFor } from '../../services/api';
 import type { SAPSystem } from '../../stores/systemStore';
@@ -7,10 +7,12 @@ import { Spinner } from '../common/Spinner';
 interface AddSystemDialogProps {
   open: boolean;
   onClose: () => void;
+  editSystem?: SAPSystem | null;
 }
 
-export function AddSystemDialog({ open, onClose }: AddSystemDialogProps) {
+export function AddSystemDialog({ open, onClose, editSystem }: AddSystemDialogProps) {
   const addSystem = useSystemStore((s) => s.addSystem);
+  const updateSystem = useSystemStore((s) => s.updateSystem);
 
   const [name, setName] = useState('');
   const [host, setHost] = useState('');
@@ -19,6 +21,16 @@ export function AddSystemDialog({ open, onClose }: AddSystemDialogProps) {
   const [password, setPassword] = useState('');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editSystem) {
+      setName(editSystem.name);
+      setHost(editSystem.host);
+      setClient(editSystem.client);
+      setUsername(editSystem.username);
+      setPassword(editSystem.password);
+    }
+  }, [editSystem]);
 
   const reset = () => {
     setName('');
@@ -55,13 +67,23 @@ export function AddSystemDialog({ open, onClose }: AddSystemDialogProps) {
 
   const handleSave = () => {
     if (!host || !username || !password) return;
-    addSystem({
-      name: name || host,
-      host,
-      client,
-      username,
-      password,
-    });
+    if (editSystem) {
+      updateSystem(editSystem.id, {
+        name: name || host,
+        host,
+        client,
+        username,
+        password,
+      });
+    } else {
+      addSystem({
+        name: name || host,
+        host,
+        client,
+        username,
+        password,
+      });
+    }
     reset();
     onClose();
   };
@@ -80,7 +102,7 @@ export function AddSystemDialog({ open, onClose }: AddSystemDialogProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-panel-border">
-          <h2 className="text-sm font-semibold">Add SAP System</h2>
+          <h2 className="text-sm font-semibold">{editSystem ? 'Edit SAP System' : 'Add SAP System'}</h2>
         </div>
 
         <div className="p-4 space-y-3">
