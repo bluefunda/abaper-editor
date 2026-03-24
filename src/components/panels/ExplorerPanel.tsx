@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
   Search, FileCode, ChevronRight, ChevronDown, FolderOpen, Plus, X,
-  Box, Circle, Layers, Table, Server,
+  Box, Circle, Layers, Table, Server, Pencil,
 } from 'lucide-react';
 import { searchObjects, getPackageContents } from '../../services/api';
 import { useSystemStore } from '../../stores/systemStore';
@@ -17,6 +17,7 @@ const EMPTY_TREE: Record<string, PackageTreeNode[]> = {};
 interface ExplorerPanelProps {
   onOpenObject: (name: string, type: string) => void;
   onAddSystem: () => void;
+  onEditSystem: (id: string) => void;
 }
 
 const TYPE_ICONS: Record<string, { icon: typeof FileCode; color: string }> = {
@@ -141,7 +142,7 @@ function PackageTreeNodeItem({
   );
 }
 
-export function ExplorerPanel({ onOpenObject, onAddSystem }: ExplorerPanelProps) {
+export function ExplorerPanel({ onOpenObject, onAddSystem, onEditSystem }: ExplorerPanelProps) {
   const systems = useSystemStore((s) => s.systems);
   const activeSystemId = useSystemStore((s) => s.activeSystemId);
   const setActiveSystem = useSystemStore((s) => s.setActiveSystem);
@@ -235,6 +236,15 @@ export function ExplorerPanel({ onOpenObject, onAddSystem }: ExplorerPanelProps)
               ))}
             </select>
           </div>
+          {activeSystemId && (
+            <button
+              className="p-1.5 text-sidebar-fg/60 hover:text-sidebar-fg hover:bg-white/5 rounded"
+              onClick={() => onEditSystem(activeSystemId)}
+              title="Edit SAP System"
+            >
+              <Icon icon={Pencil} size={13} />
+            </button>
+          )}
           <button
             className="p-1.5 text-sidebar-fg/60 hover:text-sidebar-fg hover:bg-white/5 rounded"
             onClick={onAddSystem}

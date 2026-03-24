@@ -19,6 +19,7 @@ import { ConnectionDialog } from './components/dialogs/ConnectionDialog';
 import { NewObjectDialog } from './components/dialogs/NewObjectDialog';
 import { AddSystemDialog } from './components/dialogs/AddSystemDialog';
 import { useSettingsStore } from './stores/settingsStore';
+import { useSystemStore } from './stores/systemStore';
 import { useEditorStore } from './stores/editorStore';
 import { useConnectionStore } from './stores/connectionStore';
 import { useAIStore } from './stores/aiStore';
@@ -41,6 +42,7 @@ export default function App() {
   const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
   const [newObjectDialogOpen, setNewObjectDialogOpen] = useState(false);
   const [addSystemDialogOpen, setAddSystemDialogOpen] = useState(false);
+  const [editingSystemId, setEditingSystemId] = useState<string | null>(null);
   const [cursorLine, setCursorLine] = useState(1);
   const [cursorColumn, setCursorColumn] = useState(1);
 
@@ -383,7 +385,7 @@ export default function App() {
   const sidebarContent = (() => {
     switch (sidebarPanel) {
       case 'explorer':
-        return <ExplorerPanel onOpenObject={handleOpenObject} onAddSystem={() => setAddSystemDialogOpen(true)} />;
+        return <ExplorerPanel onOpenObject={handleOpenObject} onAddSystem={() => setAddSystemDialogOpen(true)} onEditSystem={(id) => { setEditingSystemId(id); setAddSystemDialogOpen(true); }} />;
       case 'search':
         return <SearchPanel onOpenObject={handleOpenObject} />;
       case 'git':
@@ -453,7 +455,8 @@ export default function App() {
       />
       <AddSystemDialog
         open={addSystemDialogOpen}
-        onClose={() => setAddSystemDialogOpen(false)}
+        onClose={() => { setAddSystemDialogOpen(false); setEditingSystemId(null); }}
+        editSystem={editingSystemId ? useSystemStore.getState().systems.find((s) => s.id === editingSystemId) ?? null : null}
       />
     </div>
   );
