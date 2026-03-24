@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/bluefunda/abaper-editor/compare/v1.3.0...v1.4.0) (2026-03-24)
+
+
+### Features
+
+* add edit button for SAP system configuration ([#23](https://github.com/bluefunda/abaper-editor/issues/23)) ([8361d3a](https://github.com/bluefunda/abaper-editor/commit/8361d3a5a645f47db5e87f243329a80d8344c0d7))
+
 ## [1.3.0](https://github.com/bluefunda/abaper-editor/compare/v1.2.0...v1.3.0) (2026-02-28)
 
 
