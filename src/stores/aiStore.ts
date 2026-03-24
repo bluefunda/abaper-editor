@@ -64,7 +64,7 @@ export const useAIStore = create<AIState>()((set, get) => ({
   chatId: null,
   isStreaming: false,
   streamingContent: '',
-  selectedModel: 'groq',
+  selectedModel: '',
   toolExecutions: [],
   artifacts: [],
 
