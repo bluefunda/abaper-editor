@@ -77,6 +77,21 @@ export function getRoles(): string[] {
 }
 
 export function logout(): void {
+  // Inline telemetry to avoid circular imports
+  try {
+    const token = keycloak?.token;
+    const realm = getRealmFromPath();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (realm) headers['X-Realm'] = realm;
+    const url = import.meta.env.VITE_API_BASE_URL as string || 'https://api.bluefunda.com';
+    fetch(`${url}/abaper/telemetry`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ event: 'logout', properties: { client: 'editor', platform: navigator.platform, locale: navigator.language } }),
+    }).catch(() => {});
+  } catch { /* noop */ }
+
   const realm = getRealmFromPath();
   keycloak?.logout({ redirectUri: `${window.location.origin}/${realm ?? ''}` });
 }
