@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { abaperAgent, extractText, extractJSON } from '../services/mcp';
 import { streamChat } from '../services/cai';
 import { useAIStore } from '../stores/aiStore';
+import { track } from '../services/telemetry';
 import type { ReviewFinding, S4RemediationResult, S4RemediationIssue } from '../types/mcp';
 
 function parseS4Result(text: string, objectName: string, objectType: string): S4RemediationResult {
@@ -43,6 +44,7 @@ export function useAIAssistant() {
 
   const reviewCode = useCallback(
     async (objectType: string, objectName: string) => {
+      track('ai_review', { object_type: objectType });
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Review ${objectType} ${objectName}` });
       try {
@@ -85,6 +87,7 @@ export function useAIAssistant() {
 
   const analyzeS4 = useCallback(
     async (objectType: string, objectName: string) => {
+      track('ai_s4_analysis', { object_type: objectType });
       setAnalyzing(true);
       addMessage({ role: 'user', content: `S/4HANA remediation check for ${objectType} ${objectName}` });
       try {
@@ -121,6 +124,7 @@ export function useAIAssistant() {
 
   const explainCode = useCallback(
     async (source: string) => {
+      track('ai_explain');
       setAnalyzing(true);
       addMessage({ role: 'user', content: 'Explain this ABAP code' });
       try {
@@ -151,6 +155,7 @@ export function useAIAssistant() {
 
   const runTests = useCallback(
     async (objectType: string, objectName: string) => {
+      track('ai_run_tests', { object_type: objectType });
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Run unit tests for ${objectType} ${objectName}` });
       try {
@@ -201,6 +206,7 @@ export function useAIAssistant() {
 
   const optimizeCode = useCallback(
     async (objectType: string, objectName: string) => {
+      track('ai_optimize', { object_type: objectType });
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Optimize ${objectType} ${objectName}` });
       try {
@@ -232,6 +238,7 @@ export function useAIAssistant() {
 
   const fixError = useCallback(
     async (errorMessage: string, line: number, _source: string, objectType: string, objectName: string) => {
+      track('ai_fix_error', { object_type: objectType });
       setAnalyzing(true);
       addMessage({ role: 'user', content: `Fix error on line ${line}: ${errorMessage}` });
       try {
@@ -263,6 +270,7 @@ export function useAIAssistant() {
 
   const sendPrompt = useCallback(
     async (text: string, objectType: string, objectName: string, source: string, isSelection = false) => {
+      track('ai_chat_sent');
       const store = useAIStore.getState();
       setAnalyzing(true);
       addMessage({ role: 'user', content: text });

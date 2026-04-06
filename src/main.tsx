@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { initAuth } from './services/auth';
+import { track } from './services/telemetry';
 
 // Point @monaco-editor/react to the bundled monaco instance
 loader.config({ monaco });
@@ -30,6 +31,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 const root = createRoot(document.getElementById('root')!);
 
 initAuth().then(() => {
+  track('app_loaded');
   root.render(
     <StrictMode>
       <ErrorBoundary>
