@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/bluefunda/abaper-editor/compare/v1.4.0...v1.5.0) (2026-04-06)
+
+
+### Features
+
+* add telemetry tracking for editor channel ([#26](https://github.com/bluefunda/abaper-editor/issues/26)) ([30b07e3](https://github.com/bluefunda/abaper-editor/commit/30b07e37bda841d55779b75a4b3b30292fe67a0f))
+
+
+### Bug Fixes
+
+* delegate AI model selection to server-side llm-router ([#25](https://github.com/bluefunda/abaper-editor/issues/25)) ([7554c72](https://github.com/bluefunda/abaper-editor/commit/7554c726180646fc90cffe4a5f1bc105664d97e3))
+
 ## [1.4.0](https://github.com/bluefunda/abaper-editor/compare/v1.3.0...v1.4.0) (2026-03-24)
 
 
