@@ -54,16 +54,18 @@ export async function streamChat(
   if (realm) headers['X-Realm'] = realm;
   if (keycloak?.subject) headers['x-user'] = keycloak.subject;
 
+  const body: Record<string, unknown> = {
+    prompt: req.prompt,
+    agentName: req.agent_name,
+    mcpServerName: req.mcp_server_name,
+    isNewChat: req.is_new_chat,
+  };
+  if (req.model) body.model = req.model;
+
   const response = await fetch(`/ai/chats/${req.chat_id}`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      prompt: req.prompt,
-      model: req.model,
-      agentName: req.agent_name,
-      mcpServerName: req.mcp_server_name,
-      isNewChat: req.is_new_chat,
-    }),
+    body: JSON.stringify(body),
     signal,
   });
 
