@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/bluefunda/abaper-editor/compare/v1.5.0...v1.5.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* omit empty model field from chat requests ([#28](https://github.com/bluefunda/abaper-editor/issues/28)) ([a41adc2](https://github.com/bluefunda/abaper-editor/commit/a41adc266b9da021b54984fd71a4a32f6bc0cd3d))
+
 ## [1.5.0](https://github.com/bluefunda/abaper-editor/compare/v1.4.0...v1.5.0) (2026-04-06)
 
 
