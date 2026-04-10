@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/bluefunda/abaper-editor/compare/v1.5.1...v1.5.2) (2026-04-10)
+
+
+### Bug Fixes
+
+* update GitHub OAuth client ID for new OAuth App ([#30](https://github.com/bluefunda/abaper-editor/issues/30)) ([2f2e27f](https://github.com/bluefunda/abaper-editor/commit/2f2e27fc83d3b17f8a3125a425f6c2d4012eb06c))
+
 ## [1.5.1](https://github.com/bluefunda/abaper-editor/compare/v1.5.0...v1.5.1) (2026-04-07)
 
 
