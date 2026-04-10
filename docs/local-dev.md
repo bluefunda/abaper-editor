@@ -82,7 +82,7 @@ SAP_CLIENT=100
 SAP_USERNAME=your_user
 SAP_PASSWORD=your_password
 
-GITHUB_CLIENT_ID=Iv23liG5YjZgDKlGmuxC
+GITHUB_CLIENT_ID=Ov23li2XoloIy5OdKjKJ
 GITHUB_CLIENT_SECRET=your_secret
 GH_PAT=ghp_your_token
 ```

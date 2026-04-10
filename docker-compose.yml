@@ -6,7 +6,7 @@ services:
     build:
       context: .
       args:
-        VITE_GITHUB_CLIENT_ID: ${VITE_GITHUB_CLIENT_ID:-Iv23liG5YjZgDKlGmuxC}
+        VITE_GITHUB_CLIENT_ID: ${VITE_GITHUB_CLIENT_ID:-Ov23li2XoloIy5OdKjKJ}
     ports:
       - "3000:3000"
     environment:
