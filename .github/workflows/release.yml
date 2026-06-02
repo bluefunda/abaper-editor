@@ -7,11 +7,17 @@ on:
 jobs:
   release:
     uses: bluefunda/release-foundry/.github/workflows/release-please.yml@main
-    permissions:
-      contents: write
-      pull-requests: write
     with:
       release-type: node
+    secrets:
+      GH_PAT: ${{ secrets.GH_PAT }}
+
+  deploy:
+    needs: release
+    if: ${{ needs.release.outputs.release_created }}
+    uses: bluefunda/release-foundry/.github/workflows/docker-deploy.yml@main
+    with:
+      tag: ${{ needs.release.outputs.tag_name }}
     secrets:
       GH_PAT: ${{ secrets.GH_PAT }}
 
